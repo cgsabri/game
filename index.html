@@ -14,49 +14,57 @@
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col selection:bg-indigo-500 selection:text-white">
 
-  <!-- ==================== HEADER UTAMA ==================== -->
-  <header class="bg-slate-900 text-white shadow-lg sticky top-0 z-30 border-b border-slate-800">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex justify-between items-center">
-      <div class="flex items-center gap-3">
-        <div class="bg-indigo-600 p-2.5 rounded-xl shadow-lg shadow-indigo-500/30 text-xl">
-          🎮
-        </div>
-        <div>
-          <h1 class="text-xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-200 to-indigo-200 bg-clip-text text-transparent">
-            Math Games Hub
-          </h1>
-          <p class="text-xs text-slate-400 font-medium">Portal Pembelajaran Matematik Interaktif</p>
-        </div>
+ <!-- ==================== HEADER UTAMA ==================== -->
+<header class="bg-slate-900 text-white shadow-xl sticky top-0 z-30 border-b border-slate-800">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex justify-between items-center">
+    
+    <!-- Logo & Nama Portal -->
+    <div class="flex items-center gap-3.5">
+      <!-- Container Logo Sekolah -->
+      <div class="w-11 h-11 sm:w-12 sm:h-12 bg-white p-1 rounded-2xl shadow-md flex items-center justify-center shrink-0 border border-slate-700/50">
+        <img src="logo.png" alt="Logo SK Agama (MIS) Miri" class="w-full h-full object-contain">
       </div>
-      
-      <button onclick="toggleAdminModal(true)" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-semibold px-4 py-2.5 rounded-xl transition-all shadow-md shadow-indigo-600/30 active:scale-95 flex items-center gap-2">
-        <span>🔒</span>
-        <span class="hidden sm:inline">Panel Admin</span>
-      </button>
+
+      <div>
+        <h1 class="text-base sm:text-xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-100 to-indigo-200 bg-clip-text text-transparent leading-snug">
+          Portal Matematik Interaktif
+        </h1>
+        <p class="text-[11px] sm:text-xs text-indigo-300 font-semibold tracking-wide">
+          SK Agama (MIS) Miri
+        </p>
+      </div>
     </div>
-  </header>
+    
+    <!-- Butang Panel Admin -->
+    <button onclick="toggleAdminModal(true)" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-semibold px-4 py-2.5 rounded-xl transition-all shadow-md shadow-indigo-600/30 active:scale-95 flex items-center gap-2">
+      <span>🔒</span>
+      <span class="hidden sm:inline">Panel Admin</span>
+    </button>
+
+  </div>
+</header>
 
   <!-- ==================== VIEW 1: MUKA HADAPAN (CATALOG) ==================== -->
   <main id="catalogView" class="max-w-7xl mx-auto px-4 sm:px-6 py-8 flex-1 w-full space-y-8">
 
     <!-- HERO BANNER -->
-    <div class="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-700 via-indigo-600 to-purple-700 p-6 sm:p-10 text-white shadow-xl shadow-indigo-900/10">
-      <div class="relative z-10 max-w-2xl space-y-3">
-        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-white/10 backdrop-blur-md text-indigo-100 border border-white/20">
-          ✨ KSSR Semakan & Terkini
-        </span>
-        <h2 class="text-2xl sm:text-4xl font-extrabold tracking-tight leading-tight">
-          Terokai Dunia Matematik Secara Interaktif & Menyeronokkan!
-        </h2>
-        <p class="text-indigo-100 text-xs sm:text-sm leading-relaxed">
-          Pilih permainan mengikut Tahun dan Topik untuk menguji kemahiran serta mengumpul markah pencapaian anda.
-        </p>
-      </div>
-      
-      <!-- Hiasan Visual Background -->
-      <div class="absolute -right-10 -bottom-10 w-64 h-64 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
-      <div class="absolute right-1/3 -top-10 w-48 h-48 bg-purple-500/20 rounded-full blur-xl pointer-events-none"></div>
-    </div>
+<div class="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-700 via-indigo-600 to-purple-700 p-6 sm:p-10 text-white shadow-xl shadow-indigo-900/10">
+  <div class="relative z-10 max-w-2xl space-y-3">
+    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-white/10 backdrop-blur-md text-indigo-100 border border-white/20">
+      🏫 Dikendalikan oleh Panitia Matematik SK Agama (MIS) Miri
+    </span>
+    <h2 class="text-2xl sm:text-4xl font-extrabold tracking-tight leading-tight">
+      Terokai Dunia Matematik Secara Interaktif & Menyeronokkan!
+    </h2>
+    <p class="text-indigo-100 text-xs sm:text-sm leading-relaxed">
+      Pilih permainan mengikut Tahun dan Topik mengikut kurikulum KSSR Semakan untuk menguji kemahiran serta mengumpul markah pencapaian anda.
+    </p>
+  </div>
+  
+  <!-- Hiasan Visual Background -->
+  <div class="absolute -right-10 -bottom-10 w-64 h-64 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
+  <div class="absolute right-1/3 -top-10 w-48 h-48 bg-purple-500/20 rounded-full blur-xl pointer-events-none"></div>
+</div>
 
     <!-- SEKSYEN TAPISAN (SEARCH & FILTERS) -->
     <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
@@ -131,10 +139,12 @@
 
   </main>
 
-  <!-- FOOTER -->
-  <footer class="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-400 font-medium">
-    <p>© Math Games Hub. Hak Cipta Terpelihara.</p>
-  </footer>
+ 
+ <!-- FOOTER -->
+<footer class="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500 font-medium space-y-1">
+  <p class="font-bold text-slate-700">Dikendalikan sepenuhnya oleh Panitia Matematik SK Agama (MIS) Miri</p>
+  <p class="text-slate-400">© Portal Matematik Interaktif. Hak Cipta Terpelihara.</p>
+</footer>
 
   <!-- ==================== MODAL ADMIN ==================== -->
   <div id="adminModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
