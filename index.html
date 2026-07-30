@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Math Games Hub</title>
+  <title>Math Games Hub (Google Apps Script Backend)</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
@@ -14,10 +14,10 @@
     <div class="max-w-6xl mx-auto px-4 py-6 flex flex-col md:flex-row justify-between items-center gap-4">
       <div>
         <h1 class="text-2xl font-bold tracking-tight">🎮 Interactive Math Games Hub</h1>
-        <p class="text-indigo-200 text-sm">Collection of math games organized by Year Level & Topic</p>
+        <p class="text-indigo-200 text-sm">100% Free & Unlimited Google Apps Script Backend</p>
       </div>
       <button onclick="toggleAdminModal(true)" class="bg-indigo-800 hover:bg-indigo-900 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
-        ⚙️ Admin Panel (Add Game)
+        🔒 Admin Panel (Add Game)
       </button>
     </div>
   </header>
@@ -62,14 +62,14 @@
 
     <!-- Game Grid Container -->
     <div id="gameGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-      <!-- Dynamic Game Cards will load here -->
+      <!-- Dynamic Game Cards load here -->
     </div>
 
   </main>
 
   <!-- Footer -->
   <footer class="bg-white border-t border-slate-200 py-6 text-center text-sm text-slate-500">
-    <p>© Math Games Hub. Hosted on GitHub Pages.</p>
+    <p>© Math Games Hub. Hosted on GitHub Pages & Powered by Google Apps Script.</p>
   </footer>
 
   <!-- ==================== MODAL: PLAY GAME ==================== -->
@@ -123,13 +123,9 @@
           <textarea id="inputEmbed" rows="4" required placeholder='<iframe src="https://..." ...></iframe>' class="w-full border border-slate-300 rounded-lg p-2.5 text-xs font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
         </div>
 
-        <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
-          💡 <strong>Admin Note:</strong> Click "Copy JSON Data" below, then paste it into your <code>games.json</code> file in your GitHub repository.
-        </div>
-
         <div class="flex gap-2 pt-2">
-          <button type="submit" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 rounded-lg text-sm transition">
-            📋 Copy JSON Data
+          <button type="submit" id="submitBtn" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 rounded-lg text-sm transition">
+            📊 Save Directly to Google Sheet
           </button>
         </div>
       </form>
@@ -138,23 +134,38 @@
 
   <!-- JAVASCRIPT LOGIC -->
   <script>
-    let allGames = [];
+    // -------------------------------------------------------------
+    // CONFIGURATION
+    // -------------------------------------------------------------
+    const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzEBnOuEN1JtO_Og2yhCZZ8V0jXK3XoFFimzSfRK8faOwHa4ehBEKsxo95K8wNX5gFi/exec";
+    const ADMIN_PASSWORD = "admin123"; // 👈 Set your secret admin password here
 
-    // 1. Fetch Data From games.json
+    let allGames = [];
+    let isAuthenticated = false;
+
+    // 1. Fetch Games from Google Apps Script
     async function fetchGames() {
+      const grid = document.getElementById('gameGrid');
+      grid.innerHTML = `
+        <div class="col-span-full text-center py-12 text-slate-400">
+          <p class="text-base animate-pulse">⏳ Loading games from Google Sheet...</p>
+        </div>`;
+
       try {
-        const response = await fetch('games.json');
-        if (!response.ok) throw new Error("Failed to load games.json");
-        allGames = await response.json();
+        const response = await fetch(GAS_WEB_APP_URL);
+        if (!response.ok) throw new Error("Failed to reach Google Apps Script API.");
+        
+        const data = await response.json();
+        allGames = Array.isArray(data) ? data : [];
         
         populateTopicsDropdown();
         renderGames();
       } catch (error) {
-        console.error(error);
-        document.getElementById('gameGrid').innerHTML = `
+        console.error("Fetch Error:", error.message);
+        grid.innerHTML = `
           <div class="col-span-full text-center py-12 text-slate-500">
-            <p class="text-base">⚠️ Unable to load games list.</p>
-            <p class="text-xs mt-1">Make sure the <b>games.json</b> file exists in your GitHub repository.</p>
+            <p class="text-base">⚠️ Unable to load games from Google Sheets.</p>
+            <p class="text-xs mt-1 text-red-500">${error.message}</p>
           </div>`;
       }
     }
@@ -162,7 +173,7 @@
     // 2. Populate Dynamic Topics Filter
     function populateTopicsDropdown() {
       const topicSelect = document.getElementById('filterTopic');
-      const topics = [...new Set(allGames.map(g => g.topic))].sort();
+      const topics = [...new Set(allGames.map(g => g.topic).filter(Boolean))].sort();
 
       topicSelect.innerHTML = '<option value="All">All Topics</option>';
       topics.forEach(t => {
@@ -173,7 +184,7 @@
       });
     }
 
-    // 3. Render Game Cards Based on Selected Filters
+    // 3. Render Game Cards
     function renderGames() {
       const selectedTahun = document.getElementById('filterTahun').value;
       const selectedTopic = document.getElementById('filterTopic').value;
@@ -190,7 +201,7 @@
       if (filtered.length === 0) {
         grid.innerHTML = `
           <div class="col-span-full text-center py-12 bg-white rounded-xl border border-dashed border-slate-300">
-            <p class="text-slate-500 text-sm">No games found matching your selection.</p>
+            <p class="text-slate-500 text-sm">No games found matching this selection.</p>
           </div>`;
         return;
       }
@@ -199,10 +210,10 @@
         <div class="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition flex flex-col justify-between overflow-hidden">
           <div class="p-5">
             <div class="flex gap-2 mb-3">
-              <span class="bg-indigo-50 text-indigo-700 text-xs font-semibold px-2.5 py-1 rounded-md border border-indigo-100">${game.tahun}</span>
-              <span class="bg-emerald-50 text-emerald-700 text-xs font-semibold px-2.5 py-1 rounded-md border border-emerald-100">${game.topic}</span>
+              <span class="bg-indigo-50 text-indigo-700 text-xs font-semibold px-2.5 py-1 rounded-md border border-indigo-100">${game.tahun || 'N/A'}</span>
+              <span class="bg-emerald-50 text-emerald-700 text-xs font-semibold px-2.5 py-1 rounded-md border border-emerald-100">${game.topic || 'N/A'}</span>
             </div>
-            <h3 class="font-bold text-slate-800 text-lg mb-2 leading-snug">${game.title}</h3>
+            <h3 class="font-bold text-slate-800 text-lg mb-2 leading-snug">${game.title || 'Untitled Game'}</h3>
           </div>
           <div class="px-5 pb-5 pt-0">
             <button onclick="openPlayModal('${game.id}')" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 rounded-lg text-sm transition flex items-center justify-center gap-2">
@@ -213,9 +224,9 @@
       `).join('');
     }
 
-    // 4. Play Modal Logic
+    // 4. Play Modal
     function openPlayModal(gameId) {
-      const game = allGames.find(g => g.id === gameId);
+      const game = allGames.find(g => String(g.id) === String(gameId));
       if (!game) return;
 
       document.getElementById('playModalTitle').textContent = `${game.title} (${game.tahun} - ${game.topic})`;
@@ -225,39 +236,65 @@
 
     function closePlayModal() {
       document.getElementById('playModal').classList.add('hidden');
-      document.getElementById('playModalContainer').innerHTML = ''; // Clear iframe to stop audio/game playback when closed
+      document.getElementById('playModalContainer').innerHTML = '';
     }
 
-    // 5. Admin Modal Logic
+    // 5. Admin Modal (With Password Prompt)
     function toggleAdminModal(show) {
       const modal = document.getElementById('adminModal');
-      if (show) modal.classList.remove('hidden');
-      else modal.classList.add('hidden');
+
+      if (show) {
+        // If not authenticated yet, prompt for password
+        if (!isAuthenticated) {
+          const passwordInput = prompt("🔒 Admin Access Required\nPlease enter the teacher password:");
+          
+          if (passwordInput === ADMIN_PASSWORD) {
+            isAuthenticated = true; // Remembers login for the current session
+            modal.classList.remove('hidden');
+          } else if (passwordInput !== null) {
+            alert("❌ Incorrect password!");
+          }
+        } else {
+          modal.classList.remove('hidden');
+        }
+      } else {
+        modal.classList.add('hidden');
+      }
     }
 
-    function handleFormSubmit(event) {
+    async function handleFormSubmit(event) {
       event.preventDefault();
+      const submitBtn = document.getElementById('submitBtn');
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Saving to Google Sheet...";
 
       const newGame = {
-        id: Date.now().toString(),
         title: document.getElementById('inputTitle').value.trim(),
         tahun: document.getElementById('inputTahun').value,
         topic: document.getElementById('inputTopic').value.trim(),
         embedCode: document.getElementById('inputEmbed').value.trim()
       };
 
-      const updatedGamesList = [...allGames, newGame];
-      const jsonString = JSON.stringify(updatedGamesList, null, 2);
+      try {
+        const response = await fetch(GAS_WEB_APP_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(newGame)
+        });
 
-      // Copy JSON to Clipboard
-      navigator.clipboard.writeText(jsonString).then(() => {
-        alert("✅ Updated JSON code copied to clipboard!\n\nOpen your 'games.json' file in GitHub and paste this code to update your games list.");
+        if (!response.ok) throw new Error("Failed to send request.");
+
+        alert("🎉 Game saved successfully to your Google Sheet!");
         toggleAdminModal(false);
         document.getElementById('addGameForm').reset();
-      }).catch(err => {
-        alert("Failed to auto-copy. Check browser console.");
-        console.log("Your New JSON Data:\n", jsonString);
-      });
+        
+        setTimeout(fetchGames, 1000);
+      } catch (error) {
+        alert("Error saving game: " + error.message);
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "📊 Save Directly to Google Sheet";
+      }
     }
 
     // Initialize application on load
