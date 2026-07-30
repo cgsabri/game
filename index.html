@@ -236,42 +236,61 @@
 
     // 4. Open Game Player
     // 4. Open Game Player
+// Open Game Player (Handles both iframe links and raw Gemini Canvas HTML)
 function openGamePlayer(gameId) {
   const game = allGames.find(g => String(g.id) === String(gameId));
   if (!game) return;
 
+  // Update UI Titles
   document.getElementById('playerTitle').textContent = game.title;
   document.getElementById('playerBadge').textContent = `${game.tahun || ''} • ${game.topic || ''}`;
 
   let cleanEmbed = game.embedCode || '';
   cleanEmbed = cleanEmbed.replace(/\\"/g, '"');
-  const parser = new DOMParser();
-  const decoded = parser.parseFromString(cleanEmbed, 'text/html').body.textContent;
-  if (decoded && decoded.includes('<iframe')) {
-    cleanEmbed = decoded;
-  }
-
+  
   const container = document.getElementById('fullPlayerContainer');
-  container.innerHTML = cleanEmbed;
+  container.innerHTML = ''; // Clear existing frame
 
-  const iframe = container.querySelector('iframe');
-  if (iframe) {
-    iframe.setAttribute('width', '100%');
-    iframe.setAttribute('height', '100%');
+  // 1. Check if the code is raw HTML code from Gemini Canvas
+  const isRawHtml = cleanEmbed.includes('<!DOCTYPE') || 
+                     cleanEmbed.includes('<html') || 
+                     (cleanEmbed.trim().startsWith('<') && !cleanEmbed.includes('<iframe'));
+
+  if (isRawHtml) {
+    // Render raw Canvas HTML inside an isolated virtual page frame
+    const iframe = document.createElement('iframe');
     iframe.style.width = '100%';
     iframe.style.height = '100%';
-    iframe.style.minHeight = '100%';
     iframe.style.border = 'none';
     iframe.style.display = 'block';
-
-    // 🔴 FIX: Add full permissions so internal buttons/scripts work properly
-    iframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share');
-    iframe.setAttribute('allowfullscreen', 'true');
     
-    // If the game is restricted by sandbox rules, give it full script & same-origin privileges:
-    iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-popups allow-forms allow-modals');
+    // Give frame full script & interactivity privileges
+    iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-modals allow-forms allow-popups');
+    
+    // Inject Canvas code directly into memory frame
+    iframe.srcdoc = cleanEmbed;
+    container.appendChild(iframe);
+  } else {
+    // 2. Fallback for standard <iframe> embed tags or URLs
+    const parser = new DOMParser();
+    const decoded = parser.parseFromString(cleanEmbed, 'text/html').body.textContent;
+    if (decoded && decoded.includes('<iframe')) {
+      cleanEmbed = decoded;
+    }
+    
+    container.innerHTML = cleanEmbed;
+    const iframe = container.querySelector('iframe');
+    if (iframe) {
+      iframe.style.width = '100%';
+      iframe.style.height = '100%';
+      iframe.style.border = 'none';
+      iframe.style.display = 'block';
+      iframe.setAttribute('allow', 'autoplay; scripts');
+      iframe.setAttribute('allowfullscreen', 'true');
+    }
   }
 
+  // Switch to Player View
   document.getElementById('catalogView').classList.add('hidden');
   document.getElementById('gamePlayerView').classList.remove('hidden');
 
