@@ -235,40 +235,48 @@
     }
 
     // 4. Open Game Player
-    function openGamePlayer(gameId) {
-      const game = allGames.find(g => String(g.id) === String(gameId));
-      if (!game) return;
+    // 4. Open Game Player
+function openGamePlayer(gameId) {
+  const game = allGames.find(g => String(g.id) === String(gameId));
+  if (!game) return;
 
-      document.getElementById('playerTitle').textContent = game.title;
-      document.getElementById('playerBadge').textContent = `${game.tahun || ''} • ${game.topic || ''}`;
+  document.getElementById('playerTitle').textContent = game.title;
+  document.getElementById('playerBadge').textContent = `${game.tahun || ''} • ${game.topic || ''}`;
 
-      let cleanEmbed = game.embedCode || '';
-      cleanEmbed = cleanEmbed.replace(/\\"/g, '"');
-      const parser = new DOMParser();
-      const decoded = parser.parseFromString(cleanEmbed, 'text/html').body.textContent;
-      if (decoded && decoded.includes('<iframe')) {
-        cleanEmbed = decoded;
-      }
+  let cleanEmbed = game.embedCode || '';
+  cleanEmbed = cleanEmbed.replace(/\\"/g, '"');
+  const parser = new DOMParser();
+  const decoded = parser.parseFromString(cleanEmbed, 'text/html').body.textContent;
+  if (decoded && decoded.includes('<iframe')) {
+    cleanEmbed = decoded;
+  }
 
-      const container = document.getElementById('fullPlayerContainer');
-      container.innerHTML = cleanEmbed;
+  const container = document.getElementById('fullPlayerContainer');
+  container.innerHTML = cleanEmbed;
 
-      const iframe = container.querySelector('iframe');
-      if (iframe) {
-        iframe.setAttribute('width', '100%');
-        iframe.setAttribute('height', '100%');
-        iframe.style.width = '100%';
-        iframe.style.height = '100%';
-        iframe.style.minHeight = '100%';
-        iframe.style.border = 'none';
-        iframe.style.display = 'block';
-      }
+  const iframe = container.querySelector('iframe');
+  if (iframe) {
+    iframe.setAttribute('width', '100%');
+    iframe.setAttribute('height', '100%');
+    iframe.style.width = '100%';
+    iframe.style.height = '100%';
+    iframe.style.minHeight = '100%';
+    iframe.style.border = 'none';
+    iframe.style.display = 'block';
 
-      document.getElementById('catalogView').classList.add('hidden');
-      document.getElementById('gamePlayerView').classList.remove('hidden');
+    // 🔴 FIX: Add full permissions so internal buttons/scripts work properly
+    iframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share');
+    iframe.setAttribute('allowfullscreen', 'true');
+    
+    // If the game is restricted by sandbox rules, give it full script & same-origin privileges:
+    iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-popups allow-forms allow-modals');
+  }
 
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+  document.getElementById('catalogView').classList.add('hidden');
+  document.getElementById('gamePlayerView').classList.remove('hidden');
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
 
     // 5. Close Game Player
     function closeGamePlayer() {
