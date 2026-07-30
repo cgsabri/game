@@ -79,9 +79,9 @@
         <h3 id="playModalTitle" class="font-bold text-slate-800 text-lg">Game Title</h3>
         <button onclick="closePlayModal()" class="text-slate-400 hover:text-slate-600 font-bold text-xl px-2">✕</button>
       </div>
-      <div id="playModalContainer" class="p-4 flex-1 overflow-auto flex items-center justify-center min-h-[400px]">
-        <!-- Embedded iframe loads here -->
-      </div>
+     <div id="playModalContainer" class="p-4 flex-1 overflow-auto flex items-center justify-center w-full min-h-[480px] h-[65vh]">
+  <!-- Embedded iframe loads here -->
+</div>
     </div>
   </div>
 
@@ -226,13 +226,39 @@
 
     // 4. Play Modal
     function openPlayModal(gameId) {
-      const game = allGames.find(g => String(g.id) === String(gameId));
-      if (!game) return;
+  const game = allGames.find(g => String(g.id) === String(gameId));
+  if (!game) return;
 
-      document.getElementById('playModalTitle').textContent = `${game.title} (${game.tahun} - ${game.topic})`;
-      document.getElementById('playModalContainer').innerHTML = game.embedCode;
-      document.getElementById('playModal').classList.remove('hidden');
-    }
+  document.getElementById('playModalTitle').textContent = `${game.title} (${game.tahun} -${game.topic})`;
+  
+  // Clean up escaped quotes (\") and unescape HTML entities (&lt;, &gt;)
+  let cleanEmbed = game.embedCode || '';
+  
+  // Remove backslashes before quotes
+  cleanEmbed = cleanEmbed.replace(/\\"/g, '"');
+  
+  // Decode HTML entities if stored as encoded text
+  const parser = new DOMParser();
+  const decoded = parser.parseFromString(cleanEmbed, 'text/html').body.textContent;
+  if (decoded && decoded.includes('<iframe')) {
+    cleanEmbed = decoded;
+  }
+
+  // Inject into container
+  const container = document.getElementById('playModalContainer');
+  container.innerHTML = cleanEmbed;
+
+  // Ensure iframe inside fills the modal properly
+  const iframe = container.querySelector('iframe');
+  if (iframe) {
+    iframe.style.width = '100%';
+    iframe.style.height = '100%';
+    iframe.style.minHeight = '450px';
+    iframe.style.border = 'none';
+  }
+
+  document.getElementById('playModal').classList.remove('hidden');
+}
 
     function closePlayModal() {
       document.getElementById('playModal').classList.add('hidden');
