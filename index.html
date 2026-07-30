@@ -81,9 +81,10 @@
     </div>
 
     <!-- Full Width/Height Game Container -->
-    <div id="fullPlayerContainer" class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-md flex-1 min-h-[600px] h-[75vh] w-full flex items-center justify-center">
-      <!-- Embedded iframe loads here -->
-    </div>
+    <!-- Full Width/Height Game Container -->
+<div id="fullPlayerContainer" class="bg-white border border-slate-200 rounded-xl shadow-md w-full overflow-hidden min-h-[650px] h-[80vh]">
+  <!-- Embedded iframe loads here -->
+</div>
   </main>
 
   <!-- Footer -->
@@ -232,33 +233,43 @@
 
     // 4. Full Page Game Player Logic (Replaces Modal)
     function openGamePlayer(gameId) {
-      const game = allGames.find(g => String(g.id) === String(gameId));
-      if (!game) return;
+  const game = allGames.find(g => String(g.id) === String(gameId));
+  if (!game) return;
 
-      // Update Title and Badge
-      document.getElementById('playerTitle').textContent = game.title;
-      document.getElementById('playerBadge').textContent = `${game.tahun} • ${game.topic}`;
+  // Update Title and Badge
+  document.getElementById('playerTitle').textContent = game.title;
+  document.getElementById('playerBadge').textContent = `${game.tahun} • ${game.topic}`;
 
-      // Sanitization & Decoding
-      let cleanEmbed = game.embedCode || '';
-      cleanEmbed = cleanEmbed.replace(/\\"/g, '"');
-      const parser = new DOMParser();
-      const decoded = parser.parseFromString(cleanEmbed, 'text/html').body.textContent;
-      if (decoded && decoded.includes('<iframe')) {
-        cleanEmbed = decoded;
-      }
+  // Sanitization & Decoding
+  let cleanEmbed = game.embedCode || '';
+  cleanEmbed = cleanEmbed.replace(/\\"/g, '"');
+  const parser = new DOMParser();
+  const decoded = parser.parseFromString(cleanEmbed, 'text/html').body.textContent;
+  if (decoded && decoded.includes('<iframe')) {
+    cleanEmbed = decoded;
+  }
 
-      // Inject Embed Code
-      const container = document.getElementById('fullPlayerContainer');
-      container.innerHTML = cleanEmbed;
+  // Inject Embed Code
+  const container = document.getElementById('fullPlayerContainer');
+  container.innerHTML = cleanEmbed;
 
-      // Force iframe to fit 100% of container space
-      const iframe = container.querySelector('iframe');
-      if (iframe) {
-        iframe.style.width = '100%';
-        iframe.style.height = '100%';
-        iframe.style.border = 'none';
-      }
+  // Apply layout fixes directly to injected iframe elements
+  const iframe = container.querySelector('iframe');
+  if (iframe) {
+    iframe.style.width = '100%';
+    iframe.style.height = '100%';
+    iframe.style.minHeight = '650px';
+    iframe.style.border = 'none';
+    iframe.style.display = 'block';
+  }
+
+  // Switch Views
+  document.getElementById('catalogView').classList.add('hidden');
+  document.getElementById('gamePlayerView').classList.remove('hidden');
+
+  // Scroll smoothly to top
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
 
       // Switch Views
       document.getElementById('catalogView').classList.add('hidden');
