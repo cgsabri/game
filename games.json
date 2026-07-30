@@ -1,16 +1,16 @@
 [
   {
     "id": "1",
-    "title": "Kuasai Sifir 2 hingga 5",
-    "tahun": "Tahun 2",
-    "topic": "Darab",
+    "title": "Mastering Times Tables (2 to 5)",
+    "tahun": "Year 2",
+    "topic": "Multiplication",
     "embedCode": "<iframe src=\"https://wordwall.net/embed/play/12345/678/901\" width=\"100%\" height=\"500\" frameborder=\"0\" allowfullscreen></iframe>"
   },
   {
     "id": "2",
-    "title": "Mengenal Pecahan Wajar",
-    "tahun": "Tahun 3",
-    "topic": "Pecahan",
+    "title": "Understanding Proper Fractions",
+    "tahun": "Year 3",
+    "topic": "Fractions",
     "embedCode": "<iframe src=\"https://wordwall.net/embed/play/98765/432/109\" width=\"100%\" height=\"500\" frameborder=\"0\" allowfullscreen></iframe>"
   }
 ]
