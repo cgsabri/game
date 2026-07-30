@@ -3,15 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Math Games Hub (Google Apps Script Backend)</title>
+  <title>Math Games Hub</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-sans">
 
-  <!-- Header -->
-  <header class="bg-indigo-600 text-white shadow-md">
-    <div class="max-w-6xl mx-auto px-4 py-6 flex flex-col md:flex-row justify-between items-center gap-4">
+  <!-- Header (Stays Visible Always) -->
+  <header class="bg-indigo-600 text-white shadow-md sticky top-0 z-30">
+    <div class="max-w-6xl mx-auto px-4 py-4 md:py-6 flex flex-col md:flex-row justify-between items-center gap-4">
       <div>
         <h1 class="text-2xl font-bold tracking-tight">🎮 Interactive Math Games Hub</h1>
         <p class="text-indigo-200 text-sm">100% Free & Unlimited Google Apps Script Backend</p>
@@ -22,8 +22,8 @@
     </div>
   </header>
 
-  <!-- Content Wrapper -->
-  <main class="max-w-6xl mx-auto px-4 py-8 flex-1 w-full">
+  <!-- ==================== VIEW 1: HOME PAGE (CATALOG) ==================== -->
+  <main id="catalogView" class="max-w-6xl mx-auto px-4 py-8 flex-1 w-full">
 
     <!-- Filters Section -->
     <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-8 flex flex-col md:flex-row gap-4 items-center justify-between">
@@ -67,23 +67,29 @@
 
   </main>
 
+  <!-- ==================== VIEW 2: FULL PAGE GAME PLAYER ==================== -->
+  <main id="gamePlayerView" class="hidden max-w-6xl mx-auto px-4 py-6 flex-1 w-full flex flex-col">
+    <!-- Navigation Bar -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+      <div>
+        <span id="playerBadge" class="bg-indigo-50 text-indigo-700 text-xs font-semibold px-2.5 py-1 rounded-md border border-indigo-100">Year - Topic</span>
+        <h2 id="playerTitle" class="text-xl font-bold text-slate-800 mt-1">Game Title</h2>
+      </div>
+      <button onclick="closeGamePlayer()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-4 py-2 rounded-lg transition flex items-center gap-2 self-start sm:self-auto">
+        ⬅️ Back to All Games
+      </button>
+    </div>
+
+    <!-- Full Width/Height Game Container -->
+    <div id="fullPlayerContainer" class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-md flex-1 min-h-[600px] h-[75vh] w-full flex items-center justify-center">
+      <!-- Embedded iframe loads here -->
+    </div>
+  </main>
+
   <!-- Footer -->
   <footer class="bg-white border-t border-slate-200 py-6 text-center text-sm text-slate-500">
     <p>© Math Games Hub. Hosted on GitHub Pages & Powered by Google Apps Script.</p>
   </footer>
-
-  <!-- ==================== MODAL: PLAY GAME ==================== -->
-  <div id="playModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
-    <div class="bg-white rounded-2xl max-w-4xl w-full overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-      <div class="p-4 bg-slate-100 border-b border-slate-200 flex justify-between items-center">
-        <h3 id="playModalTitle" class="font-bold text-slate-800 text-lg">Game Title</h3>
-        <button onclick="closePlayModal()" class="text-slate-400 hover:text-slate-600 font-bold text-xl px-2">✕</button>
-      </div>
-     <div id="playModalContainer" class="p-4 flex-1 overflow-auto flex items-center justify-center w-full min-h-[480px] h-[65vh]">
-  <!-- Embedded iframe loads here -->
-</div>
-    </div>
-  </div>
 
   <!-- ==================== MODAL: ADMIN (ADD GAME) ==================== -->
   <div id="adminModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
@@ -216,7 +222,7 @@
             <h3 class="font-bold text-slate-800 text-lg mb-2 leading-snug">${game.title || 'Untitled Game'}</h3>
           </div>
           <div class="px-5 pb-5 pt-0">
-            <button onclick="openPlayModal('${game.id}')" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 rounded-lg text-sm transition flex items-center justify-center gap-2">
+            <button onclick="openGamePlayer('${game.id}')" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 rounded-lg text-sm transition flex items-center justify-center gap-2">
               ▶️ Play Game
             </button>
           </div>
@@ -224,58 +230,62 @@
       `).join('');
     }
 
-    // 4. Play Modal
-    function openPlayModal(gameId) {
-  const game = allGames.find(g => String(g.id) === String(gameId));
-  if (!game) return;
+    // 4. Full Page Game Player Logic (Replaces Modal)
+    function openGamePlayer(gameId) {
+      const game = allGames.find(g => String(g.id) === String(gameId));
+      if (!game) return;
 
-  document.getElementById('playModalTitle').textContent = `${game.title} (${game.tahun} -${game.topic})`;
-  
-  // Clean up escaped quotes (\") and unescape HTML entities (&lt;, &gt;)
-  let cleanEmbed = game.embedCode || '';
-  
-  // Remove backslashes before quotes
-  cleanEmbed = cleanEmbed.replace(/\\"/g, '"');
-  
-  // Decode HTML entities if stored as encoded text
-  const parser = new DOMParser();
-  const decoded = parser.parseFromString(cleanEmbed, 'text/html').body.textContent;
-  if (decoded && decoded.includes('<iframe')) {
-    cleanEmbed = decoded;
-  }
+      // Update Title and Badge
+      document.getElementById('playerTitle').textContent = game.title;
+      document.getElementById('playerBadge').textContent = `${game.tahun} • ${game.topic}`;
 
-  // Inject into container
-  const container = document.getElementById('playModalContainer');
-  container.innerHTML = cleanEmbed;
+      // Sanitization & Decoding
+      let cleanEmbed = game.embedCode || '';
+      cleanEmbed = cleanEmbed.replace(/\\"/g, '"');
+      const parser = new DOMParser();
+      const decoded = parser.parseFromString(cleanEmbed, 'text/html').body.textContent;
+      if (decoded && decoded.includes('<iframe')) {
+        cleanEmbed = decoded;
+      }
 
-  // Ensure iframe inside fills the modal properly
-  const iframe = container.querySelector('iframe');
-  if (iframe) {
-    iframe.style.width = '100%';
-    iframe.style.height = '100%';
-    iframe.style.minHeight = '450px';
-    iframe.style.border = 'none';
-  }
+      // Inject Embed Code
+      const container = document.getElementById('fullPlayerContainer');
+      container.innerHTML = cleanEmbed;
 
-  document.getElementById('playModal').classList.remove('hidden');
-}
+      // Force iframe to fit 100% of container space
+      const iframe = container.querySelector('iframe');
+      if (iframe) {
+        iframe.style.width = '100%';
+        iframe.style.height = '100%';
+        iframe.style.border = 'none';
+      }
 
-    function closePlayModal() {
-      document.getElementById('playModal').classList.add('hidden');
-      document.getElementById('playModalContainer').innerHTML = '';
+      // Switch Views
+      document.getElementById('catalogView').classList.add('hidden');
+      document.getElementById('gamePlayerView').classList.remove('hidden');
+
+      // Scroll smoothly to top
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    // 5. Admin Modal (With Password Prompt)
+    function closeGamePlayer() {
+      // Clear iframe to stop audio/game playback
+      document.getElementById('fullPlayerContainer').innerHTML = '';
+
+      // Switch Views Back to Grid
+      document.getElementById('gamePlayerView').classList.add('hidden');
+      document.getElementById('catalogView').classList.remove('hidden');
+    }
+
+    // 5. Admin Modal Logic
     function toggleAdminModal(show) {
       const modal = document.getElementById('adminModal');
 
       if (show) {
-        // If not authenticated yet, prompt for password
         if (!isAuthenticated) {
           const passwordInput = prompt("🔒 Admin Access Required\nPlease enter the teacher password:");
-          
           if (passwordInput === ADMIN_PASSWORD) {
-            isAuthenticated = true; // Remembers login for the current session
+            isAuthenticated = true;
             modal.classList.remove('hidden');
           } else if (passwordInput !== null) {
             alert("❌ Incorrect password!");
