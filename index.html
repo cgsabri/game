@@ -82,11 +82,12 @@
     </div>
 
     <!-- Responsive Container for Game -->
-    <div class="max-w-7xl w-full mx-auto flex-1 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col min-h-[720px] h-[calc(100vh-160px)]">
-      <div id="fullPlayerContainer" class="w-full h-full flex-1">
-        <!-- Embedded iframe loads here -->
-      </div>
-    </div>
+    <!-- Responsive Container for Game -->
+<div class="max-w-7xl w-full mx-auto bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col h-[85vh] min-h-[700px]">
+  <div id="fullPlayerContainer" class="w-full h-full flex-1 overflow-y-auto">
+    <!-- Embedded iframe loads here -->
+  </div>
+</div>
 
   </main>
 
@@ -256,21 +257,21 @@ function openGamePlayer(gameId) {
                      cleanEmbed.includes('<html') || 
                      (cleanEmbed.trim().startsWith('<') && !cleanEmbed.includes('<iframe'));
 
-  if (isRawHtml) {
-    // Render raw Canvas HTML inside an isolated virtual page frame
-    const iframe = document.createElement('iframe');
-    iframe.style.width = '100%';
-    iframe.style.height = '100%';
-    iframe.style.border = 'none';
-    iframe.style.display = 'block';
-    
-    // Give frame full script & interactivity privileges
-    iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-modals allow-forms allow-popups');
-    
-    // Inject Canvas code directly into memory frame
-    iframe.srcdoc = cleanEmbed;
-    container.appendChild(iframe);
-  } else {
+  // Inside openGamePlayer(gameId)...
+
+if (isRawHtml) {
+  const iframe = document.createElement('iframe');
+  iframe.style.width = '100%';
+  iframe.style.height = '100%';
+  iframe.style.minHeight = '750px'; // Forces enough vertical space for Canvas UI
+  iframe.style.border = 'none';
+  iframe.style.display = 'block';
+  iframe.setAttribute('scrolling', 'yes'); // Ensures inner scrollbar appears if needed
+  iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-modals allow-forms allow-popups');
+  
+  iframe.srcdoc = cleanEmbed;
+  container.appendChild(iframe);
+}} else {
     // 2. Fallback for standard <iframe> embed tags or URLs
     const parser = new DOMParser();
     const decoded = parser.parseFromString(cleanEmbed, 'text/html').body.textContent;
