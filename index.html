@@ -271,7 +271,7 @@ if (isRawHtml) {
   
   iframe.srcdoc = cleanEmbed;
   container.appendChild(iframe);
-}} else {
+} else {
     // 2. Fallback for standard <iframe> embed tags or URLs
     const parser = new DOMParser();
     const decoded = parser.parseFromString(cleanEmbed, 'text/html').body.textContent;
