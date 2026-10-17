@@ -1,0 +1,847 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Math Island Expedition</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@500;700;800;900&display=swap">
+<style>
+/* Layout: full-screen game. Navy HUD bar on top, scrollable isometric island map below,
+   floating mission card (left) + minimap (right), modal cards for questions. Single bright look. */
+:root{
+  --sea:#57c3e6; --navy:#1e3a6b; --navy-2:#2c5296; --navy-3:#3d68b3;
+  --ink:#1c2a44; --muted:#5b6b86; --paper:#ffffff; --paper-2:#f2f6fc; --line:#d5e0ef;
+  --accent:#ff8a3d; --accent-2:#ffb27a; --gold:#ffbf2e; --good:#1f9d5c; --good-bg:#e3f6ea;
+  --bad:#d63d3d; --bad-bg:#fde9e9; --lock:#9aa6b8;
+  --display:"Baloo 2","Trebuchet MS",system-ui,sans-serif;
+  --body:"Nunito","Segoe UI",system-ui,sans-serif;
+  color-scheme:light;
+}
+html,body{height:100%}
+body{background:var(--sea);color:var(--ink);font-family:var(--body);font-size:16px;overflow:hidden;-webkit-tap-highlight-color:transparent}
+button{font-family:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,textarea:focus-visible,.station:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.app{display:flex;flex-direction:column;height:100%}
+
+/* ---------- HUD ---------- */
+.hud{display:flex;align-items:center;gap:12px;background:linear-gradient(180deg,var(--navy-2),var(--navy));color:#fff;
+  padding-block:8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  box-shadow:0 3px 0 rgba(0,0,0,.15);position:relative;z-index:5;flex-wrap:wrap}
+.logo{display:flex;align-items:center;gap:8px;background:var(--gold);color:var(--navy);border-radius:12px;padding:4px 10px 2px;
+  font-family:var(--display);font-weight:800;line-height:1;font-size:15px;box-shadow:inset 0 -3px 0 rgba(0,0,0,.15)}
+.logo small{display:block;font-size:10px;letter-spacing:.08em;font-weight:700}
+.who{display:flex;align-items:center;gap:8px;min-width:0}
+.who .av{width:34px;height:34px;border-radius:50%;background:#fff;display:grid;place-items:center;flex:none}
+.who b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px}
+.who span{font-size:12px;opacity:.85;display:flex;align-items:center;gap:5px}
+.who span::before{content:"";width:8px;height:8px;border-radius:50%;background:#4ade80}
+.task{flex:1;min-width:180px}
+.task .lbl{font-size:12px;opacity:.8;letter-spacing:.04em}
+.task .txt{font-weight:800;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar{height:9px;background:rgba(255,255,255,.2);border-radius:9px;overflow:hidden;margin-top:3px}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--gold),var(--accent));border-radius:9px;transition:width .6s}
+.count{font-family:var(--display);font-weight:800;font-size:15px;opacity:.9}
+.pills{display:flex;gap:6px}
+.pill{background:rgba(255,255,255,.14);border-radius:20px;padding:4px 11px;font-weight:900;display:flex;gap:5px;align-items:center;font-variant-numeric:tabular-nums}
+.pill.pop{animation:pop .5s}
+@keyframes pop{40%{transform:scale(1.3);background:var(--gold);color:var(--navy)}}
+.tools{display:flex;gap:6px}
+.tool{background:var(--paper);color:var(--navy);border:0;border-radius:10px;padding:4px 8px 3px;min-width:52px;display:flex;flex-direction:column;align-items:center;
+  font-size:11px;font-weight:800;box-shadow:inset 0 -3px 0 #c8d5ea;line-height:1.15}
+.tool .ic{font-size:17px}
+.tool:active{transform:translateY(1px)}
+@media (max-width:860px){
+  .task{order:5;flex-basis:100%}
+  .tool{min-width:40px;padding:5px 6px}.tool .t{display:none}
+  .logo small{display:none}
+}
+@media (max-width:520px){.count,.logo,.who span{display:none}.who b{max-width:80px}.hud{gap:8px}.pill{padding:3px 8px;font-size:14px}.tools{gap:4px}.tool{min-width:34px;padding:4px}.tool .ic{font-size:15px}.minimap{display:none}.mission-card{width:auto;right:12px}}
+
+/* ---------- Stage & map ---------- */
+.stage{flex:1;position:relative;overflow:hidden;min-height:0}
+.map-wrap{position:absolute;inset:0;overflow:auto;background:var(--sea);touch-action:pan-x pan-y;scrollbar-width:thin}
+.map-svg{display:block;width:100%;height:100%;min-width:1000px;min-height:560px}
+.station{cursor:pointer}
+.station .bld{transition:transform .2s}
+.station:hover .bld{transform:translateY(-4px)}
+.station.locked{cursor:not-allowed}
+.station.locked .bld{filter:grayscale(.85) brightness(1.05);opacity:.75}
+.bounce{animation:bounce 1s ease-in-out infinite;transform-box:fill-box}
+@keyframes bounce{50%{transform:translateY(-10px)}}
+.walking .pbody{animation:bob .32s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(-3px)}}
+
+/* floating panels */
+.panel{position:absolute;background:var(--paper);border-radius:16px;box-shadow:0 6px 0 rgba(30,58,107,.18),0 10px 30px rgba(0,0,0,.12);z-index:3}
+.mission-card{top:12px;left:max(12px,env(safe-area-inset-left,0px));width:290px;max-width:calc(100% - 24px);overflow:hidden}
+.mc-head{background:var(--navy);color:#fff;padding:10px 12px;display:flex;gap:10px;align-items:center;cursor:pointer;border:0;width:100%;text-align:left}
+.mc-num{width:30px;height:30px;border-radius:50%;background:var(--gold);color:var(--navy);display:grid;place-items:center;font-family:var(--display);font-weight:800;flex:none}
+.mc-head b{display:block;font-family:var(--display);font-size:16px;line-height:1.1}
+.mc-head small{font-size:12px;opacity:.85}
+.mc-head .chev{margin-left:auto;transition:transform .2s;font-size:14px}
+.mission-card.closed .chev{transform:rotate(-90deg)}
+.mission-card.closed .mc-body{display:none}
+.mc-body{padding:10px 12px 12px;display:grid;gap:10px}
+.steps{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.steps li{display:flex;gap:8px;align-items:flex-start;font-size:14px;font-weight:700;color:var(--muted)}
+.steps li i{width:20px;height:20px;border-radius:50%;flex:none;display:grid;place-items:center;font-style:normal;font-size:12px;border:2px solid var(--line);background:#fff}
+.steps li.done{color:var(--ink)}
+.steps li.done i{background:var(--good);border-color:var(--good);color:#fff}
+.steps li.now{color:var(--navy);background:#fff6d6;border-radius:8px;margin:-3px -5px;padding:3px 5px}
+.steps li.now i{border-color:var(--accent);background:var(--accent)}
+.doing{font-size:13px;background:var(--paper-2);border-radius:10px;padding:7px 9px;color:var(--navy);font-weight:700}
+.row-btns{display:flex;gap:8px}
+.btn{border:0;border-radius:12px;padding:10px 16px;font-weight:900;font-size:15px;box-shadow:inset 0 -4px 0 rgba(0,0,0,.18);transition:transform .1s}
+.btn:active{transform:translateY(2px);box-shadow:inset 0 -2px 0 rgba(0,0,0,.18)}
+.btn.primary{background:var(--accent);color:#fff}
+.btn.blue{background:var(--navy-3);color:#fff}
+.btn.ghost{background:var(--paper-2);color:var(--navy);box-shadow:inset 0 -4px 0 var(--line)}
+.btn.good{background:var(--good);color:#fff}
+.btn.sm{padding:7px 10px;font-size:13px;border-radius:10px;flex:1}
+.btn[disabled]{opacity:.5;cursor:default}
+.minimap{top:12px;right:max(12px,env(safe-area-inset-right,0px));width:190px;padding:8px}
+.minimap .mm-t{font-size:12px;font-weight:900;color:var(--navy);display:flex;justify-content:space-between;margin-bottom:4px}
+.minimap svg{display:block;width:100%;height:auto;border-radius:10px;background:var(--sea)}
+.online{margin-top:6px;font-size:12px;font-weight:800;color:var(--navy);background:var(--paper-2);border-radius:8px;padding:5px 8px;display:flex;gap:6px;align-items:center}
+.online::before{content:"";width:8px;height:8px;border-radius:50%;background:#22c55e}
+@media (max-width:700px){.minimap{width:120px;padding:6px}.minimap .mm-t span:last-child{display:none}.online{font-size:11px}}
+.toast{position:absolute;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);background:var(--navy);color:#fff;
+  padding:10px 16px;border-radius:14px;font-weight:800;font-size:14px;opacity:0;transition:.3s;z-index:4;max-width:calc(100% - 32px);text-align:center;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.zoom{position:absolute;right:max(12px,env(safe-area-inset-right,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:3;display:flex;flex-direction:column;gap:6px}
+.zoom button{width:42px;height:42px;border-radius:12px;border:0;background:#fff;color:var(--navy);font-size:20px;font-weight:900;box-shadow:inset 0 -4px 0 var(--line),0 4px 10px rgba(0,0,0,.15)}
+
+/* ---------- Modal ---------- */
+.modal{position:fixed;inset:0;z-index:20;display:grid;place-items:center;background:rgba(18,32,60,.55);backdrop-filter:blur(3px);
+  padding:16px max(16px,env(safe-area-inset-right,0px)) 16px max(16px,env(safe-area-inset-left,0px))}
+.card{background:var(--paper);border-radius:20px;width:min(680px,100%);max-height:calc(100% - 8px);overflow:auto;box-shadow:0 8px 0 rgba(30,58,107,.35),0 20px 50px rgba(0,0,0,.3);animation:rise .3s}
+@keyframes rise{from{transform:translateY(20px) scale(.97);opacity:0}}
+.card-top{background:var(--navy);color:#fff;padding:12px 18px;display:flex;justify-content:space-between;gap:10px;align-items:center;position:sticky;top:0;z-index:1}
+.card-top b{font-family:var(--display);font-size:18px;line-height:1.1}
+.card-top span{font-size:13px;font-weight:800;opacity:.9;white-space:nowrap}
+.card-in{padding:16px 18px 18px;display:grid;gap:14px}
+.dots{display:flex;gap:5px}
+.dots i{flex:1;height:6px;border-radius:6px;background:var(--line)}
+.dots i.on{background:var(--good)}.dots i.cur{background:var(--accent)}
+.q-text{font-family:var(--display);font-size:22px;line-height:1.25;margin:0;text-wrap:balance;font-weight:700}
+.q-visual{display:flex;justify-content:center;flex-wrap:wrap;gap:12px;background:var(--paper-2);border-radius:16px;padding:12px}
+.opts{display:grid;gap:10px}
+.opt{display:flex;align-items:center;gap:12px;background:#fff;border:3px solid var(--line);border-radius:16px;padding:10px 14px;text-align:left;font-size:18px;font-weight:800;color:var(--ink);min-height:58px;transition:border-color .15s,background .15s}
+.opt:hover:not([disabled]){border-color:var(--navy-3);background:#f6f9ff}
+.opt .L{width:32px;height:32px;border-radius:50%;background:var(--navy);color:#fff;display:grid;place-items:center;flex:none;font-family:var(--display);font-size:17px}
+.opt.right{border-color:var(--good);background:var(--good-bg)}.opt.right .L{background:var(--good)}
+.opt.wrong{border-color:var(--bad);background:var(--bad-bg);animation:shake .4s}.opt.wrong .L{background:var(--bad)}
+.opt[disabled]{cursor:default}
+@keyframes shake{20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
+.feedback{border-radius:14px;padding:12px 14px;font-size:16px;font-weight:700;line-height:1.4}
+.feedback.good{background:var(--good-bg);color:#145c38}
+.feedback.bad{background:var(--bad-bg);color:#8f2424}
+.feedback b{font-family:var(--display);font-size:18px;margin-right:4px}
+.working{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:16px;background:#fff;border-radius:10px;padding:8px 14px;margin-top:8px;display:inline-block;white-space:pre;line-height:1.35;color:var(--ink)}
+.foot{display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap}
+.foot .btn{min-width:130px}
+.clock-wrap{display:flex;flex-direction:column;align-items:center;gap:4px;font-weight:800;color:var(--navy);font-size:14px;text-align:center;max-width:150px}
+.tag{background:#fff;border:2px dashed var(--accent);color:var(--ink);border-radius:12px;padding:8px 12px;font-weight:900;font-size:18px;display:flex;align-items:center;gap:6px}
+.plus{font-size:24px;font-weight:900;color:var(--navy);align-self:center}
+.digits{display:flex;gap:8px}
+.digits span{width:64px;height:78px;border-radius:14px;background:#fff;border:3px solid var(--navy-3);display:grid;place-items:center;font-family:var(--display);font-size:46px;font-weight:800;color:var(--navy)}
+.shade-area{display:flex;flex-direction:column;align-items:center;gap:10px}
+.shade-svg path,.shade-svg rect{cursor:pointer;transition:fill .15s}
+.shade-count{font-weight:800;color:var(--navy)}
+.fruit-pic{display:grid;grid-template-columns:repeat(8,1fr);gap:4px;font-size:28px;background:#fff;border-radius:12px;padding:8px;max-width:360px}
+.fruit-pic span{display:grid;place-items:center}
+.fruit-t{border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;font-weight:800;min-width:260px}
+.fruit-t th{background:var(--navy);color:#fff;padding:6px 12px;font-size:14px}
+.fruit-t td{border-top:1px solid var(--line);padding:4px 12px;text-align:center;height:40px}
+.fruit-t td:first-child{text-align:left}
+.fruit-t .q{color:var(--lock)}
+.fruit-t .new{background:#fff6d6}
+.tw{overflow-x:auto;max-width:100%}
+/* nets */
+.nets{display:grid;gap:12px}
+.zones{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.zone{background:#fff;border:2px solid var(--line);border-radius:14px;padding:6px;display:flex;flex-direction:column;align-items:center;gap:4px;min-height:170px}
+.zone .nm{font-size:12px;font-weight:900;color:var(--navy);text-align:center}
+.slot{width:100%;flex:1;min-height:78px;border:2px dashed var(--lock);border-radius:10px;display:grid;place-items:center;font-size:12px;color:var(--lock);font-weight:800}
+.zone.hot .slot{border-color:var(--accent);background:#fff3e8}
+.tray{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;min-height:90px;background:var(--paper-2);border-radius:14px;padding:8px;border:2px dashed transparent}
+.tray.hot{border-color:var(--accent)}
+.net{width:84px;background:#fff;border:3px solid var(--navy-3);border-radius:12px;padding:3px;touch-action:none;user-select:none;cursor:grab;display:flex;flex-direction:column;align-items:center}
+.net b{font-family:var(--display);font-size:14px;color:var(--navy);line-height:1}
+.net.sel{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-2)}
+.net.ok{border-color:var(--good)}
+.net.bad{border-color:var(--bad);animation:shake .4s}
+.slot .net{width:100%;border-width:2px}
+.drag-ghost{position:fixed;pointer-events:none;z-index:50;opacity:.9;transform:translate(-50%,-50%) rotate(-4deg)}
+@media (max-width:560px){.zones{grid-template-columns:repeat(3,1fr)}.q-text{font-size:19px}.opt{font-size:16px}.digits span{width:54px;height:66px;font-size:38px}}
+/* intro & misc */
+.intro{display:flex;gap:14px;align-items:flex-end}
+.intro .npc{flex:none}
+.bubble{background:var(--paper-2);border-radius:18px 18px 18px 4px;padding:12px 14px;font-size:17px;font-weight:700;line-height:1.4;position:relative}
+.bubble .nm{font-family:var(--display);color:var(--accent);font-weight:800;font-size:15px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{background:var(--paper-2);color:var(--navy);border-radius:20px;padding:5px 11px;font-size:13px;font-weight:800}
+.note{font-size:14px;color:var(--muted);font-weight:700;margin:0}
+.stars{font-size:46px;letter-spacing:6px;text-align:center;line-height:1}
+.stars i{font-style:normal;display:inline-block;animation:starIn .5s both}
+.stars i.off{filter:grayscale(1);opacity:.3}
+@keyframes starIn{from{transform:scale(0) rotate(-90deg)}}
+.big-c{text-align:center;display:grid;gap:6px}
+.big-c h2{font-family:var(--display);font-size:28px;margin:0;color:var(--navy)}
+.list{display:grid;gap:6px}
+.li{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:12px;background:var(--paper-2);font-weight:800;border:0;text-align:left;font-size:15px;color:var(--ink);width:100%}
+.li .n{width:28px;height:28px;border-radius:50%;background:var(--navy);color:#fff;display:grid;place-items:center;font-size:13px;flex:none}
+.li.locked{opacity:.55}.li .s{margin-left:auto;white-space:nowrap}
+.field{display:grid;gap:4px;font-weight:800;font-size:14px;color:var(--navy)}
+.field input,.field textarea{font:inherit;font-size:17px;padding:10px 12px;border-radius:12px;border:2px solid var(--line);background:#fff;color:var(--ink)}
+.key{font-size:14px;line-height:1.45}
+.key h4{margin:10px 0 4px;color:var(--navy);font-family:var(--display);font-size:16px}
+.key ol{margin:0;padding-left:20px}
+/* start screen */
+.start .card{width:min(520px,100%)}
+.hero{background:linear-gradient(180deg,#8fdcf2,#57c3e6);padding:18px;text-align:center;position:relative}
+.hero h1{font-family:var(--display);font-size:clamp(30px,7vw,42px);line-height:.95;margin:6px 0 2px;color:var(--navy);text-shadow:0 3px 0 #fff}
+.hero p{margin:0;font-weight:800;color:var(--navy)}
+.cert{border:6px double var(--gold);border-radius:18px;padding:18px;text-align:center;background:linear-gradient(180deg,#fffdf4,#fff);display:grid;gap:6px}
+.cert .t1{font-family:var(--display);font-size:14px;letter-spacing:.2em;color:var(--accent);font-weight:800}
+.cert .t2{font-family:var(--display);font-size:30px;color:var(--navy);font-weight:800;line-height:1.1}
+.cert .nm{font-family:var(--display);font-size:32px;font-weight:800;border-bottom:2px solid var(--line);padding-bottom:2px;margin:4px auto 0;min-width:60%}
+.cert .stats{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:6px}
+.cert .stats div{background:var(--paper-2);border-radius:12px;padding:6px 12px;font-weight:900}
+.coin-fly{position:fixed;z-index:60;font-size:26px;pointer-events:none;animation:fly .9s forwards}
+@keyframes fly{to{transform:translateY(-80px);opacity:0}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="hud">
+    <div class="logo"><span aria-hidden="true">🏝️</span><div>MATH ISLAND<small>EXPEDITION · YEAR 2</small></div></div>
+    <div class="who"><div class="av" id="hudAv"></div><div><b id="hudName">Explorer</b><span id="hudCls">Online · 1 player</span></div></div>
+    <div class="task"><div class="lbl">CURRENT TASK</div><div class="txt" id="hudTask">Go to the Clock Tower</div><div class="bar"><i id="hudBar" style="width:0%"></i></div></div>
+    <div class="count" id="hudCount">0/10</div>
+    <div class="pills"><div class="pill" id="pStars">⭐ <span>0</span></div><div class="pill" id="pCoins">🪙 <span>0</span></div></div>
+    <nav class="tools">
+      <button class="tool" data-tool="guide"><span class="ic">📘</span><span class="t">Guide</span></button>
+      <button class="tool" data-tool="ach"><span class="ic">🏆</span><span class="t">Awards</span></button>
+      <button class="tool" data-tool="players"><span class="ic">👥</span><span class="t">Players</span></button>
+      <button class="tool" data-tool="audio"><span class="ic" id="audIc">🔊</span><span class="t">Audio</span></button>
+      <button class="tool" data-tool="settings"><span class="ic">⚙️</span><span class="t">Settings</span></button>
+    </nav>
+  </header>
+  <main class="stage">
+    <div class="map-wrap" id="mapWrap">
+      <svg class="map-svg" id="map" viewBox="0 20 1200 720" preserveAspectRatio="xMidYMid meet" aria-label="Math Island map">
+        <g id="world"></g>
+        <g id="playerLayer"></g>
+      </svg>
+    </div>
+    <section class="panel mission-card" id="mCard"></section>
+    <aside class="panel minimap">
+      <div class="mm-t"><span>🗺️ Island map</span><span id="mmPct">0%</span></div>
+      <svg viewBox="0 20 1200 720"><use href="#world"/><circle id="mmDot" r="26" fill="#d63d3d" stroke="#fff" stroke-width="10"/></svg>
+      <div class="online">Online: 1 player</div>
+    </aside>
+    <div class="zoom"><button id="centerBtn" aria-label="Find my explorer">📍</button></div>
+    <div class="toast" id="toast" role="status"></div>
+  </main>
+</div>
+<div class="modal" id="modal" hidden><div class="card" id="mBox" role="dialog" aria-modal="true"></div></div>
+
+<script>
+/* ================= helpers ================= */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const strip=s=>String(s).replace(/<[^>]+>/g,'');
+const rad=d=>d*Math.PI/180;
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function seeded(seed){return()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+
+/* ================= drawings ================= */
+function clockSVG(h,m,size=140){
+  let s=`<svg viewBox="0 0 120 120" width="${size}" height="${size}" role="img" aria-label="Analogue clock"><circle cx="60" cy="60" r="56" fill="#fff" stroke="#2c5296" stroke-width="5"/>`;
+  for(let i=0;i<60;i++){const a=rad(i*6),r1=i%5?49:45;s+=`<line x1="${60+r1*Math.sin(a)}" y1="${60-r1*Math.cos(a)}" x2="${60+52*Math.sin(a)}" y2="${60-52*Math.cos(a)}" stroke="#2c5296" stroke-width="${i%5?1:2.6}"/>`}
+  for(let n=1;n<=12;n++){const a=rad(n*30);s+=`<text x="${60+36*Math.sin(a)}" y="${60-36*Math.cos(a)+5}" text-anchor="middle" font-size="14" font-weight="800" font-family="Nunito,sans-serif" fill="#1c2a44">${n}</text>`}
+  const ha=rad(((h%12)+m/60)*30),ma=rad(m*6);
+  s+=`<line x1="60" y1="60" x2="${60+24*Math.sin(ha)}" y2="${60-24*Math.cos(ha)}" stroke="#1c2a44" stroke-width="6" stroke-linecap="round"/>`;
+  s+=`<line x1="60" y1="60" x2="${60+41*Math.sin(ma)}" y2="${60-41*Math.cos(ma)}" stroke="#ff8a3d" stroke-width="3.5" stroke-linecap="round"/>`;
+  return s+`<circle cx="60" cy="60" r="4.5" fill="#1c2a44"/></svg>`;
+}
+function scaleSVG(unit,val,item){
+  const max=unit==='g'?1000:10,cx=100,cy=150,r=62;
+  let s=`<svg viewBox="0 0 200 230" width="200" height="230" role="img" aria-label="Weighing scale">`;
+  s+=`<rect x="40" y="56" width="120" height="14" rx="6" fill="#9aa6b8"/><rect x="92" y="66" width="16" height="20" fill="#7d899c"/>`;
+  s+=`<rect x="20" y="80" width="160" height="140" rx="26" fill="#ff8a3d"/><rect x="20" y="200" width="160" height="20" rx="10" fill="#e06f22"/>`;
+  s+=`<circle cx="${cx}" cy="${cy}" r="${r+4}" fill="#fff" stroke="#1e3a6b" stroke-width="4"/>`;
+  for(let i=0;i<20;i++){const a=rad(i*18),r1=i%2?r-6:r-11;s+=`<line x1="${cx+r1*Math.sin(a)}" y1="${cy-r1*Math.cos(a)}" x2="${cx+r*Math.sin(a)}" y2="${cy-r*Math.cos(a)}" stroke="#1e3a6b" stroke-width="${i%2?1.2:2.4}"/>`}
+  for(let i=0;i<10;i++){const a=rad(i*36),lab=unit==='g'?i*100:i;s+=`<text x="${cx+(r-22)*Math.sin(a)}" y="${cy-(r-22)*Math.cos(a)+4}" text-anchor="middle" font-size="${unit==='g'?10:13}" font-weight="800" font-family="Nunito,sans-serif" fill="#1c2a44">${lab}</text>`}
+  s+=`<text x="${cx}" y="${cy+24}" text-anchor="middle" font-size="13" font-weight="900" font-family="Nunito,sans-serif" fill="#ff8a3d">${unit}</text>`;
+  const a=rad(val/max*360);
+  s+=`<line x1="${cx}" y1="${cy}" x2="${cx+(r-4)*Math.sin(a)}" y2="${cy-(r-4)*Math.cos(a)}" stroke="#d63d3d" stroke-width="3.5" stroke-linecap="round"/><circle cx="${cx}" cy="${cy}" r="5" fill="#d63d3d"/>`;
+  // item on the plate
+  const w=Math.max(70,item.length*11+20);
+  s+=`<rect x="${100-w/2}" y="12" width="${w}" height="44" rx="10" fill="#fff3d6" stroke="#c99a3c" stroke-width="2.5"/><text x="100" y="40" text-anchor="middle" font-size="15" font-weight="900" font-family="Nunito,sans-serif" fill="#7a5512">${item}</text>`;
+  return s+'</svg>';
+}
+function tallySVG(n){
+  const groups=Math.floor(n/5),rest=n%5,w=groups*34+rest*8+6;
+  let s=`<svg viewBox="0 0 ${Math.max(w,10)} 30" width="${Math.max(w,10)*1.1}" height="33" aria-label="tally ${n}">`,x=4;
+  for(let g=0;g<groups;g++){for(let i=0;i<4;i++)s+=`<line x1="${x+i*7}" y1="3" x2="${x+i*7}" y2="27" stroke="#1c2a44" stroke-width="2.6" stroke-linecap="round"/>`;
+    s+=`<line x1="${x-4}" y1="22" x2="${x+25}" y2="8" stroke="#d63d3d" stroke-width="2.6" stroke-linecap="round"/>`;x+=34}
+  for(let i=0;i<rest;i++)s+=`<line x1="${x+i*8}" y1="3" x2="${x+i*8}" y2="27" stroke="#1c2a44" stroke-width="2.6" stroke-linecap="round"/>`;
+  return s+'</svg>';
+}
+const NET_FILL='#ffe7c2',NET_ST='#1e3a6b';
+function netSVG(kind){
+  const R=(x,y,w,h)=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${NET_FILL}" stroke="${NET_ST}" stroke-width="2"/>`;
+  let s=`<svg viewBox="0 0 100 100" width="76" height="76">`;
+  if(kind==='cube'){const a=22;[[1,0],[0,1],[1,1],[2,1],[1,2],[1,3]].forEach(([c,r])=>s+=R(17+c*a,6+r*a,a,a))}
+  if(kind==='cuboid'){s+=R(38,4,24,14)+R(38,18,24,32)+R(38,50,24,14)+R(38,64,24,32)+R(24,18,14,32)+R(62,18,14,32)}
+  if(kind==='cylinder'){s+=R(22,30,56,40)+`<circle cx="50" cy="17" r="13" fill="${NET_FILL}" stroke="${NET_ST}" stroke-width="2"/><circle cx="50" cy="83" r="13" fill="${NET_FILL}" stroke="${NET_ST}" stroke-width="2"/>`}
+  if(kind==='cone'){const cx=50,cy=8,r=62,a1=rad(150),a2=rad(210);s+=`<path d="M${cx} ${cy} L${cx+r*Math.sin(a1)} ${cy-r*Math.cos(a1)} A${r} ${r} 0 0 1 ${cx+r*Math.sin(a2)} ${cy-r*Math.cos(a2)} Z" fill="${NET_FILL}" stroke="${NET_ST}" stroke-width="2"/><circle cx="50" cy="${cy+r+12}" r="12" fill="${NET_FILL}" stroke="${NET_ST}" stroke-width="2"/>`;s=s.replace('viewBox="0 0 100 100"','viewBox="0 0 100 100"')}
+  if(kind==='pyramid'){s+=R(36,36,28,28)+[`36,36 64,36 50,8`,`64,36 64,64 92,50`,`36,64 64,64 50,92`,`36,36 36,64 8,50`].map(p=>`<polygon points="${p}" fill="${NET_FILL}" stroke="${NET_ST}" stroke-width="2"/>`).join('')}
+  return s+'</svg>';
+}
+function solidSVG(kind){
+  const F='#bfe0ff',T='#e3f1ff',S='#8fc2f2',st=`stroke="#1e3a6b" stroke-width="2" stroke-linejoin="round"`;
+  let s=`<svg viewBox="0 0 100 90" width="84" height="76">`;
+  if(kind==='cube')s+=`<polygon points="22,32 62,32 62,78 22,78" fill="${F}" ${st}/><polygon points="22,32 40,16 80,16 62,32" fill="${T}" ${st}/><polygon points="62,32 80,16 80,62 62,78" fill="${S}" ${st}/>`;
+  if(kind==='cuboid')s+=`<polygon points="8,40 70,40 70,76 8,76" fill="${F}" ${st}/><polygon points="8,40 24,24 86,24 70,40" fill="${T}" ${st}/><polygon points="70,40 86,24 86,60 70,76" fill="${S}" ${st}/>`;
+  if(kind==='cylinder')s+=`<path d="M24 20 L24 70 A26 9 0 0 0 76 70 L76 20" fill="${F}" ${st}/><ellipse cx="50" cy="20" rx="26" ry="9" fill="${T}" ${st}/>`;
+  if(kind==='cone')s+=`<path d="M50 8 L22 72 A28 9 0 0 0 78 72 Z" fill="${F}" ${st}/><path d="M22 72 A28 9 0 0 1 78 72" fill="none" stroke="#1e3a6b" stroke-width="1.5" stroke-dasharray="3 3"/>`;
+  if(kind==='pyramid')s+=`<polygon points="50,8 16,70 58,80" fill="${F}" ${st}/><polygon points="50,8 58,80 86,62" fill="${S}" ${st}/><polyline points="16,70 44,54 86,62" fill="none" stroke="#1e3a6b" stroke-width="1.5" stroke-dasharray="3 3"/><line x1="50" y1="8" x2="44" y2="54" stroke="#1e3a6b" stroke-width="1.5" stroke-dasharray="3 3"/>`;
+  return s+'</svg>';
+}
+function kidSVG(size=34){return `<svg viewBox="-20 -60 40 66" width="${size}" height="${size}"><circle cx="0" cy="-36" r="13" fill="#f2c29b"/><path d="M-13 -38 Q-12 -54 0 -52 Q13 -54 13 -38 Q8 -46 0 -45 Q-8 -46 -13 -38Z" fill="#3b2a20"/><rect x="-11" y="-23" width="22" height="18" rx="6" fill="#fff" stroke="#c9d6e8"/><rect x="-10" y="-6" width="20" height="10" rx="3" fill="#1e3a6b"/></svg>`}
+function npcSVG(size=90){return `<svg viewBox="-40 -100 80 104" width="${size}" height="${size*1.3}" aria-hidden="true">
+<ellipse cx="0" cy="2" rx="26" ry="5" fill="#000" opacity=".12"/>
+<path d="M-24 0 Q-26 -40 -14 -52 L14 -52 Q26 -40 24 0Z" fill="#2fa39a"/>
+<path d="M-24 -48 Q-26 -96 0 -96 Q26 -96 24 -48 Q14 -40 0 -40 Q-14 -40 -24 -48Z" fill="#ffffff" stroke="#d8e2ee" stroke-width="2"/>
+<circle cx="0" cy="-70" r="15" fill="#f0c19a"/><circle cx="-5" cy="-72" r="2" fill="#1c2a44"/><circle cx="5" cy="-72" r="2" fill="#1c2a44"/>
+<path d="M-5 -64 Q0 -60 5 -64" stroke="#1c2a44" stroke-width="2" fill="none" stroke-linecap="round"/>
+<rect x="10" y="-40" width="18" height="24" rx="3" fill="#ffbf2e" stroke="#c99a3c" stroke-width="2" transform="rotate(12 19 -28)"/></svg>`}
+
+/* ================= question bank ================= */
+const DOCK=[140,612];
+const MISSIONS=[
+ {id:1,name:'Clock Tower',topic:'Time in numerals & words',icon:'🕰️',kind:'tower',x:270,y:520,
+  intro:'Welcome to the Clock Tower! The clocks here only work if you can say the time correctly. Match each time to its numerals or words.',
+  hint:'Remember: quarter past = 15 minutes, half past = 30 minutes, and "twenty to" means 20 minutes before the hour.',
+  questions:[
+   {type:'mcq',q:'Write <b>6:30</b> in words.',opts:['half past six','half past five','six thirteen'],explain:'30 minutes after 6 o\'clock is half past six.'},
+   {type:'mcq',q:'Write <b>quarter past three</b> in numerals.',opts:['3:15','3:45','4:15'],explain:'Quarter past means 15 minutes after the hour, so 3:15.'},
+   {type:'mcq',q:'Write <b>eight fifty</b> in numerals.',opts:['8:50','8:05','5:08'],explain:'Eight fifty is 8 hours and 50 minutes: 8:50.'},
+   {type:'mcq',q:'Write <b>twenty to ten</b> in numerals.',opts:['9:40','10:20','10:40'],explain:'20 minutes before 10:00 is 9:40.'}
+  ]},
+ {id:2,name:'Magic Clocks',topic:'Reading analogue clocks',icon:'⏰',kind:'clocks',x:440,y:592,
+  intro:'These magic clocks have stopped! Look at the short hand for the hour and the long hand for the minutes, then pick the right time.',
+  hint:'The short hand shows the hour. The long orange hand shows the minutes: count in fives from 12.',
+  questions:[
+   {type:'mcq',q:'What time does the clock show?',v:{clock:[2,20]},opts:['2:20','4:10','2:04'],explain:'The short hand is just past 2 and the long hand points to 4 (20 minutes).'},
+   {type:'mcq',q:'What time does the clock show?',v:{clock:[5,45]},opts:['5:45','6:45','9:25'],explain:'The long hand is on 9 (45 minutes). The short hand has not reached 6 yet, so it is 5:45.'},
+   {type:'mcq',q:'What time does the clock show?',v:{clock:[10,0]},opts:['10:00','12:10','10:12'],explain:'The long hand is on 12 and the short hand is on 10, so it is 10 o\'clock.'},
+   {type:'mcq',q:'What time does the clock show?',v:{clock:[11,35]},opts:['11:35','7:55','11:07'],explain:'The long hand is on 7 (35 minutes) and the short hand is past 11.'},
+   {type:'mcq',q:'What time does the clock show?',v:{clock:[8,10]},opts:['8:10','2:40','8:02'],explain:'The long hand is on 2 (10 minutes) and the short hand is just past 8.'},
+   {type:'mcq',q:'What time does the clock show?',v:{clock:[12,55]},opts:['12:55','11:55','1:55'],explain:'The long hand is on 11 (55 minutes). The short hand is almost at 1 but has not reached it, so it is 12:55.'}
+  ]},
+ {id:3,name:'Fraction Pizza Shop',topic:'Fractions & decimals',icon:'🍕',kind:'pizza',x:592,y:482,
+  intro:'The pizza chef needs help! First match decimals to fractions, then shade the right number of parts.',
+  hint:'0.7 means 7 tenths. In a fraction, the bottom number tells how many equal parts there are.',
+  questions:[
+   {type:'mcq',q:'Which fraction is equal to <b>0.7</b>?',opts:['7/10','1/7','7/100'],explain:'0.7 is seven tenths, which is 7/10.'},
+   {type:'mcq',q:'Which fraction is equal to <b>0.5</b>?',opts:['5/10','1/5','5/100'],explain:'0.5 is five tenths, which is 5/10.'},
+   {type:'mcq',q:'Which fraction is equal to <b>0.2</b>?',opts:['2/10','1/2','2/100'],explain:'0.2 is two tenths, which is 2/10.'},
+   {type:'shade',q:'Shade <b>3/8</b> of the pizza.',shape:'circle',parts:8,need:3,explain:'3/8 means 3 out of 8 equal parts.'},
+   {type:'shade',q:'Shade <b>2/6</b> of the chocolate bar.',shape:'rect',parts:6,need:2,explain:'2/6 means 2 out of 6 equal parts.'},
+   {type:'shade',q:'Shade <b>3/4</b> of the square.',shape:'square',parts:4,need:3,explain:'3/4 means 3 out of 4 equal parts.'}
+  ]},
+ {id:4,name:'Weighing Market',topic:'Mass (g and kg)',icon:'⚖️',kind:'market',x:430,y:362,
+  intro:'The market sellers need to know how heavy their goods are. Read each scale carefully. Check if it shows g or kg!',
+  hint:'Look at where the red pointer stops. Check the unit in the middle of the dial (g or kg).',
+  questions:[
+   {type:'mcq',q:'What is the mass of the bag of flour?',v:{scale:['g',600,'FLOUR']},opts:['600 g','500 g','700 g'],explain:'The pointer is on 600, and the unit is g.'},
+   {type:'mcq',q:'What is the mass of the watermelon?',v:{scale:['kg',5,'WATERMELON']},opts:['5 kg','4 kg','6 kg'],explain:'The pointer is on 5, and the unit is kg.'},
+   {type:'mcq',q:'What is the mass of the bag of nuts?',v:{scale:['g',350,'NUTS']},opts:['350 g','300 g','450 g'],explain:'The pointer is halfway between 300 and 400, so it is 350 g.'},
+   {type:'mcq',q:'What is the mass of the box of tea?',v:{scale:['g',150,'TEA']},opts:['150 g','100 g','250 g'],explain:'The pointer is halfway between 100 and 200, so it is 150 g.'}
+  ]},
+ {id:5,name:'Place Value Cave',topic:'Place value & digit value',icon:'🔢',kind:'cave',x:262,y:282,
+  intro:'A secret number guards this cave: 846. Tell me the place and value of each digit to open the door!',
+  hint:'From left to right the places are hundreds, tens, ones.',
+  questions:[
+   {type:'mcq',q:'The digit <b>8</b> is in the ____ place.',v:{number:846},opts:['hundreds','tens','ones'],explain:'8 is the first of three digits, so it is in the hundreds place.'},
+   {type:'mcq',q:'The digit value of <b>8</b> is ____.',v:{number:846},opts:['800','80','8'],explain:'8 hundreds = 800.'},
+   {type:'mcq',q:'The digit <b>4</b> is in the ____ place.',v:{number:846},opts:['tens','hundreds','ones'],explain:'4 is in the middle, so it is in the tens place.'},
+   {type:'mcq',q:'The digit value of <b>6</b> is ____.',v:{number:846},opts:['6','60','600'],explain:'6 is in the ones place, so its value is 6.'}
+  ]},
+ {id:6,name:'Coin Bank',topic:'Adding money (RM)',icon:'💰',kind:'bank',x:452,y:184,
+  intro:'Welcome to the Coin Bank! Add up the money in each row. Line up the ringgit and sen to add them.',
+  hint:'Add the sen first, then the ringgit. Remember 100 sen = RM1.',
+  questions:[
+   {type:'mcq',q:'Add the money.',v:{money:[23.40,15.35,6.20]},opts:['RM 44.95','RM 43.95','RM 44.59'],marks:2},
+   {type:'mcq',q:'Add the money.',v:{money:[32.15,40.60,17.25]},opts:['RM 90.00','RM 89.00','RM 80.90'],marks:2},
+   {type:'mcq',q:'Add the money.',v:{money:[12.50,25.30,8.10]},opts:['RM 45.90','RM 45.80','RM 44.90'],marks:2}
+  ]},
+ {id:7,name:'Shape Lab',topic:'Nets of 3D shapes',icon:'🔷',kind:'lab',x:692,y:204,
+  intro:'The scientists mixed up their shape nets! Drag each net (P to T) onto the 3D shape it folds into. You can also tap a net, then tap a shape.',
+  hint:'Count the faces. A cube has 6 equal squares. A cylinder has 2 circles. A pyramid has triangles.',
+  questions:[{type:'nets',q:'Match each net to its 3D shape.',marks:10}]},
+ {id:8,name:'Fruit Garden',topic:'Data & tally marks',icon:'🍎',kind:'garden',x:880,y:304,
+  intro:'The pupils of Year 2 Bijak picked their favourite fruits. Count each fruit in the picture and complete the table.',
+  hint:'Count carefully. Touch each fruit with your finger as you count. A tally gate (four lines and a cross line) is 5.',
+  questions:[
+   {type:'mcq',q:'How many pupils chose <b>apple</b> 🍎?',v:{fruits:1},fill:['apple','num'],opts:['7','6','8']},
+   {type:'mcq',q:'Which tally shows the number of <b>apples</b>?',v:{fruits:1},fill:['apple','tally'],opts:[tallySVG(7),tallySVG(6),tallySVG(8)],key:'tally for 7'},
+   {type:'mcq',q:'How many pupils chose <b>banana</b> 🍌?',v:{fruits:1},fill:['banana','num'],opts:['5','6','4']},
+   {type:'mcq',q:'Which tally shows the number of <b>bananas</b>?',v:{fruits:1},fill:['banana','tally'],opts:[tallySVG(5),tallySVG(4),tallySVG(6)],key:'tally for 5'},
+   {type:'mcq',q:'How many pupils chose <b>orange</b> 🍊?',v:{fruits:1},fill:['orange','num'],opts:['9','8','7']},
+   {type:'mcq',q:'Which tally shows the number of <b>oranges</b>?',v:{fruits:1},fill:['orange','tally'],opts:[tallySVG(9),tallySVG(8),tallySVG(10)],key:'tally for 9'}
+  ]},
+ {id:9,name:"Amin's House",topic:'Time in daily activities',icon:'🏠',kind:'house',x:822,y:502,
+  intro:"The clocks show Amin's activities on Sunday. Read each clock and complete Amin's timetable.",
+  hint:'Morning is before 12 noon. Afternoon is after 12 noon. Evening comes after the afternoon.',
+  questions:[
+   {type:'mcq',q:'What time does Amin <b>wake up</b>?',v:{day:1},opts:['7:00 in the morning','7:00 in the evening','12:35 in the afternoon'],explain:'The short hand is on 7 and the long hand is on 12. People wake up in the morning.'},
+   {type:'mcq',q:'What time does Amin <b>help father wash the car</b>?',v:{day:1},opts:['10:30 in the morning','6:50 in the morning','10:30 at night'],explain:'The long hand is on 6 (30 minutes) and the short hand is between 10 and 11.'},
+   {type:'mcq',q:'What does Amin do at <b>4:15 in the afternoon</b>?',v:{day:1},opts:['Play football','Fly a kite','Wake up'],explain:'The clock beside "Play football" shows 4:15.'},
+   {type:'mcq',q:'What time does Amin <b>fly a kite</b>?',v:{day:1},opts:['5:40 in the evening','8:25 in the evening','5:40 in the morning'],explain:'The long hand is on 8 (40 minutes) and the short hand is between 5 and 6. Flying a kite happens in the evening.'}
+  ]},
+ {id:10,name:'Story Room',topic:'BONUS · Maths stories',icon:'📖',kind:'story',x:1012,y:594,
+  intro:"Last stop! Every number sentence tells a story. Choose the story that matches the number sentence for Ali's shop.",
+  hint:'The + sign means "altogether" or "total". Which story adds the two amounts?',
+  questions:[
+   {type:'mcq',q:'Which story matches the number sentence?',v:{story:1},marks:3,story:true,
+    opts:["Ali's shop sold books for RM120 and pencils for RM75. The total sales were RM195.","Ali's shop sold books for RM120 and pencils for RM75. Ali had RM45 left.","Ali bought 120 books and 75 pencils. He had 195 pencils."],
+    explain:'RM120 + RM75 = RM195 means two amounts added together to make a total.'}
+  ]}
+];
+const NET_KINDS=[['cube','Cube'],['cuboid','Cuboid'],['cylinder','Cylinder'],['cone','Cone'],['pyramid','Pyramid']];
+const DAY=[['Wake up',7,0],['Help father wash the car',10,30],['Play football',4,15],['Fly a kite',5,40]];
+const FRUITS={apple:['🍎','Apple',7],banana:['🍌','Banana',5],orange:['🍊','Orange',9],mango:['🥭','Mango',3]};
+const FRUIT_PIC=(()=>{const r=seeded(11);let a=[];for(const k in FRUITS)for(let i=0;i<FRUITS[k][2];i++)a.push(FRUITS[k][0]);for(let i=a.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a})();
+const qMarks=q=>q.marks||1;
+const mMax=m=>m.questions.reduce((s,q)=>s+qMarks(q),0);
+const TOTAL=MISSIONS.reduce((s,m)=>s+mMax(m),0);
+
+/* ================= state ================= */
+const SAVE='mathIsland.v1';
+let state={name:'',cls:'',coins:0,done:{},pos:0,muted:false,unlockAll:false};
+try{const s=JSON.parse(localStorage.getItem(SAVE)||'null');if(s&&typeof s==='object')state=Object.assign(state,s)}catch(e){}
+function save(){try{localStorage.setItem(SAVE,JSON.stringify(state))}catch(e){}}
+const totalStars=()=>Object.values(state.done).reduce((s,d)=>s+d.stars,0);
+const totalMarks=()=>Object.values(state.done).reduce((s,d)=>s+d.marks,0);
+const doneCount=()=>Object.keys(state.done).length;
+const isUnlocked=m=>state.unlockAll||m.id===1||!!state.done[m.id-1]||!!state.done[m.id];
+const nextMission=()=>MISSIONS.find(m=>!state.done[m.id]);
+let run=null; // active mission run
+
+/* ================= sound ================= */
+let AC=null;
+function tone(f,d,type='sine',vol=.14,when=0){if(state.muted)return;try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();const t=AC.currentTime+when,o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.value=f;g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(g).connect(AC.destination);o.start(t);o.stop(t+d+.02)}catch(e){}}
+const sfx={ding(){tone(880,.25);tone(1320,.4,'sine',.11,.1)},oops(){tone(240,.22,'triangle',.12);tone(180,.3,'triangle',.1,.12)},
+  win(){[523,659,784,1047].forEach((f,i)=>tone(f,.35,'sine',.12,i*.13))},step(){tone(520,.04,'square',.02)},tap(){tone(660,.06,'sine',.06)}};
+
+/* ================= world drawing ================= */
+function isoBox(x,y,a,b,h,c){
+  const F=[x,y],L=[x-a,y-a/2],Rt=[x+b,y-b/2],B=[x-a+b,y-a/2-b/2],up=p=>[p[0],p[1]-h],P=ps=>ps.map(p=>p.join(',')).join(' ');
+  return `<polygon points="${P([F,L,up(L),up(F)])}" fill="${c[0]}"/><polygon points="${P([F,Rt,up(Rt),up(F)])}" fill="${c[1]}"/><polygon points="${P([up(F),up(L),up(B),up(Rt)])}" fill="${c[2]}"/>`;
+}
+function roof(x,y,a,b,h,rh,col,col2){
+  const F=[x,y-h],L=[x-a,y-a/2-h],Rt=[x+b,y-b/2-h],B=[x-a+b,y-a/2-b/2-h],A=[x+(b-a)/2,y-(a+b)/4-h-rh],P=ps=>ps.map(p=>p.join(',')).join(' ');
+  return `<polygon points="${P([L,B,A])}" fill="${col2}"/><polygon points="${P([B,Rt,A])}" fill="${col2}"/><polygon points="${P([F,L,A])}" fill="${col}"/><polygon points="${P([F,Rt,A])}" fill="${col2}"/>`;
+}
+const BLD={
+  tower:{a:28,b:28,h:104,c:['#efd9ad','#d6bb8b','#f6e7c6'],rh:40,r:['#e05a47','#b94434']},
+  clocks:{a:42,b:42,h:36,c:['#c6b2ef','#a58fdb','#ddd1f6'],rh:30,r:['#6e56b8','#5a449f']},
+  pizza:{a:46,b:38,h:42,c:['#fff3dc','#efd9b2','#fffaf0'],rh:34,r:['#e5483d','#c23b31']},
+  market:{a:44,b:44,h:26,c:['#ffe08a','#f0c552','#fff0bf'],rh:38,r:['#2fa39a','#23847c']},
+  bank:{a:46,b:46,h:52,c:['#e2ecf8','#c0d2ea','#f0f5fb'],rh:26,r:['#2c5296','#1e3a6b']},
+  lab:{a:40,b:52,h:48,c:['#ffffff','#dfe8f2','#f7fafc'],rh:30,r:['#3cb0c9','#2a8ea5']},
+  house:{a:40,b:40,h:40,c:['#ffd9b3','#efbd8b','#ffe8cf'],rh:42,r:['#c0563c','#a0442e']},
+  story:{a:44,b:40,h:44,c:['#ffe1ec','#f2c0d3','#fff0f5'],rh:34,r:['#d14d82','#b03b6a']}
+};
+function plaqueY(m){if(m.kind==='cave')return m.y-112;if(m.kind==='garden')return m.y-96;const d=BLD[m.kind];return m.y-d.h-d.rh-(d.a+d.b)/4-24}
+function building(m){
+  const {x,y}=m;
+  if(m.kind==='cave')return `<path d="M${x-64} ${y} Q${x-60} ${y-70} ${x-10} ${y-86} Q${x+52} ${y-80} ${x+64} ${y} Z" fill="#a3acb7"/><path d="M${x-64} ${y} Q${x-60} ${y-70} ${x-10} ${y-86} Q${x-30} ${y-40} ${x-20} ${y} Z" fill="#bfc6cf"/><path d="M${x-22} ${y} Q${x} ${y-56} ${x+24} ${y} Z" fill="#3b3f46"/><circle cx="${x+30}" cy="${y-50}" r="5" fill="#8b949f"/><circle cx="${x-40}" cy="${y-30}" r="4" fill="#8b949f"/>`;
+  if(m.kind==='garden'){let s=`<ellipse cx="${x}" cy="${y-8}" rx="74" ry="34" fill="#8cc95a" stroke="#c9a06a" stroke-width="5" stroke-dasharray="2 7"/>`;
+    [[-36,-14,'#e5483d'],[34,-12,'#ff9a1f'],[0,-30,'#ffd23f'],[-6,6,'#e5483d']].forEach(([dx,dy,f])=>{const tx=x+dx,ty=y+dy;s+=`<rect x="${tx-3}" y="${ty-20}" width="6" height="20" fill="#8a5a33"/><circle cx="${tx}" cy="${ty-34}" r="20" fill="#3f9b4a"/><circle cx="${tx-14}" cy="${ty-40}" r="16" fill="#4fb35a"/><circle cx="${tx-7}" cy="${ty-30}" r="4" fill="${f}"/><circle cx="${tx+8}" cy="${ty-40}" r="4" fill="${f}"/><circle cx="${tx-14}" cy="${ty-46}" r="4" fill="${f}"/>`});return s}
+  const d=BLD[m.kind];let s=isoBox(x,y,d.a,d.b,d.h,d.c)+roof(x,y,d.a,d.b,d.h,d.rh,d.r[0],d.r[1]);
+  // door on the right face, windows on the left face
+  s+=`<polygon points="${x+12},${y-6} ${x+24},${y-12} ${x+24},${y-34} ${x+12},${y-28}" fill="${d.r[1]}" opacity=".85"/>`;
+  if(d.h>34)s+=`<polygon points="${x-14},${y-d.h+12} ${x-26},${y-d.h+6} ${x-26},${y-d.h+20} ${x-14},${y-d.h+26}" fill="#8fd3f2"/>`;
+  if(m.kind==='tower')s+=`<circle cx="${x+14}" cy="${y-82}" r="11" fill="#fff" stroke="#b94434" stroke-width="3"/><line x1="${x+14}" y1="${y-82}" x2="${x+14}" y2="${y-90}" stroke="#1c2a44" stroke-width="2"/><line x1="${x+14}" y1="${y-82}" x2="${x+20}" y2="${y-80}" stroke="#1c2a44" stroke-width="2"/>`;
+  return s;
+}
+function stationSVG(m){
+  const done=state.done[m.id],locked=!isUnlocked(m),nx=nextMission(),isNext=nx&&nx.id===m.id&&!locked;
+  const py=plaqueY(m);
+  let s=`<g class="station ${locked?'locked':''}" data-id="${m.id}" tabindex="0" role="button" aria-label="Mission ${m.id}: ${esc(m.name)}${locked?' (locked)':''}">`;
+  s+=`<ellipse cx="${m.x}" cy="${m.y+2}" rx="66" ry="26" fill="#000" opacity=".09"/><g class="bld">${building(m)}`;
+  s+=`<circle cx="${m.x}" cy="${py}" r="19" fill="#fff" stroke="${locked?'#9aa6b8':'#1e3a6b'}" stroke-width="3"/><text x="${m.x}" y="${py+7}" text-anchor="middle" font-size="20">${locked?'🔒':m.icon}</text></g>`;
+  if(isNext)s+=`<g class="bounce"><path d="M${m.x-14} ${py-54} h28 v24 h-8 l-6 8 l-6 -8 h-8z" fill="#ffbf2e" stroke="#c99a3c" stroke-width="2"/><text x="${m.x}" y="${py-35}" text-anchor="middle" font-size="18" font-weight="900" font-family="Baloo 2,sans-serif" fill="#1e3a6b">!</text></g>`;
+  const label=m.name.toUpperCase(),w=label.length*8.6+44,sy=m.y+16;
+  s+=`<rect x="${m.x-w/2}" y="${sy}" width="${w}" height="26" rx="8" fill="${locked?'#9aa6b8':done?'#1f9d5c':'#1e3a6b'}" stroke="#fff" stroke-width="2.5"/>`;
+  s+=`<circle cx="${m.x-w/2+14}" cy="${sy+13}" r="9" fill="#ffbf2e"/><text x="${m.x-w/2+14}" y="${sy+17.5}" text-anchor="middle" font-size="12" font-weight="900" font-family="Nunito,sans-serif" fill="#1e3a6b">${m.id}</text>`;
+  s+=`<text x="${m.x+10}" y="${sy+18}" text-anchor="middle" font-size="13" font-weight="900" font-family="Nunito,sans-serif" fill="#fff" letter-spacing=".5">${esc(label)}</text>`;
+  if(done)s+=`<text x="${m.x}" y="${sy+46}" text-anchor="middle" font-size="15">${'⭐'.repeat(done.stars)}</text>`;
+  return s+'</g>';
+}
+function palm(x,y,s=1){return `<g transform="translate(${x} ${y}) scale(${s})"><ellipse cx="0" cy="2" rx="16" ry="5" fill="#000" opacity=".1"/><path d="M0 0 Q4 -24 -2 -46" stroke="#9a6a3c" stroke-width="6" fill="none" stroke-linecap="round"/>${[[-26,-50,-30],[24,-52,30],[-18,-60,-70],[18,-62,70],[0,-48,0]].map(([dx,dy,r])=>`<ellipse cx="${dx*.6-2}" cy="${dy}" rx="20" ry="6" fill="#3e9e4b" transform="rotate(${r} ${dx*.6-2} ${dy})"/>`).join('')}</g>`}
+function bush(x,y){return `<g><circle cx="${x}" cy="${y}" r="11" fill="#5fb653"/><circle cx="${x+11}" cy="${y+2}" r="9" fill="#4fa548"/><circle cx="${x-9}" cy="${y+3}" r="8" fill="#6cc25e"/></g>`}
+function hill(x,y,r){return `<g><path d="M${x-r} ${y} Q${x-r*.2} ${y-r*1.5} ${x+r*.1} ${y-r*1.15} Q${x+r*.5} ${y-r*1.05} ${x+r} ${y} Z" fill="#c99a62"/><path d="M${x-r} ${y} Q${x-r*.2} ${y-r*1.5} ${x+r*.1} ${y-r*1.15} Q${x-r*.15} ${y-r*.6} ${x-r*.1} ${y} Z" fill="#ddb57f"/></g>`}
+function drawWorld(){
+  const isl="M80 620 C40 500 120 300 220 200 C320 100 560 80 760 120 C960 160 1120 300 1130 460 C1140 600 1020 700 820 700 C600 712 300 702 160 692 C110 686 90 662 80 620Z";
+  let s=`<defs><pattern id="waves" width="80" height="40" patternUnits="userSpaceOnUse"><path d="M6 22 q10 -8 20 0 t20 0" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="2.5" stroke-linecap="round"/></pattern></defs>`;
+  s+=`<rect x="-200" y="-100" width="1600" height="1000" fill="#57c3e6"/><rect x="-200" y="-100" width="1600" height="1000" fill="url(#waves)"/>`;
+  s+=`<path d="${isl}" fill="#8fd8ec" stroke="#8fd8ec" stroke-width="80" stroke-linejoin="round"/>`;
+  s+=`<path d="${isl}" fill="#f2dca2" stroke="#f2dca2" stroke-width="40" stroke-linejoin="round"/>`;
+  s+=`<path d="${isl}" fill="#b4dc7c"/>`;
+  [[360,460,120,60],[760,420,150,70],[600,220,130,50],[980,500,90,50],[200,420,80,50]].forEach(([x,y,rx,ry])=>s+=`<ellipse cx="${x}" cy="${y}" rx="${rx}" ry="${ry}" fill="#a3d06a" opacity=".7"/>`);
+  // dock
+  s+=`<g><rect x="30" y="626" width="120" height="22" rx="4" fill="#b98552" transform="skewY(-12) translate(0 10)"/>${[0,1,2,3,4,5].map(i=>`<line x1="${42+i*18}" y1="${646-i*3.8}" x2="${42+i*18}" y2="${666-i*3.8}" stroke="#7a5230" stroke-width="4"/>`).join('')}<path d="M30 690 l14 -26 l14 26z" fill="#fff"/><rect x="18" y="690" width="50" height="10" rx="4" fill="#e5483d"/></g>`;
+  // road
+  const pts=[DOCK,...MISSIONS.map(m=>[m.x,m.y])].map(p=>p.join(',')).join(' ');
+  s+=`<polyline points="${pts}" fill="none" stroke="#d8bf82" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>`;
+  s+=`<polyline points="${pts}" fill="none" stroke="#efdcab" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>`;
+  s+=`<polyline points="${pts}" fill="none" stroke="#fff" stroke-width="3" stroke-dasharray="8 12" stroke-linecap="round" opacity=".8"/>`;
+  // decor (behind stations)
+  [[600,330,48],[1000,420,52],[330,410,44],[1060,330,40],[180,345,40]].forEach(h=>s+=hill(...h));
+  [[118,520,1],[205,395,.9],[340,650,1],[560,650,1.1],[705,610,.9],[960,440,.9],[1080,470,1],[760,370,.9],[340,170,.9],[565,140,1],[985,240,.9],[150,300,.9],[920,650,1],[660,420,.8]].forEach(p=>s+=palm(...p));
+  [[520,560],[360,580],[300,350],[520,270],[620,140],[800,270],[930,560],[720,660],[1100,560],[250,640]].forEach(p=>s+=bush(...p));
+  // teacher NPC near dock
+  s+=`<g id="npcMap" class="station" tabindex="0" role="button" aria-label="Teacher Smart guide" transform="translate(196 640) scale(.55)">${npcSVG(80).replace(/<svg[^>]*>|<\/svg>/g,'')}<g class="bounce"><circle cx="0" cy="-122" r="14" fill="#fff" stroke="#1e3a6b" stroke-width="3"/><text x="0" y="-115" text-anchor="middle" font-size="20" font-weight="900" fill="#ff8a3d" font-family="Baloo 2,sans-serif">?</text></g></g>`;
+  s+=`<g id="stations"></g>`;
+  $('#world').innerHTML=s;
+  drawStations();
+}
+function drawStations(){$('#stations').innerHTML=MISSIONS.slice().sort((a,b)=>a.y-b.y).map(stationSVG).join('')}
+
+/* ================= player & walking ================= */
+const PATH=[DOCK,...MISSIONS.map(m=>[m.x,m.y])];
+let ppos=PATH[state.pos]?PATH[state.pos].slice():DOCK.slice(),walking=false;
+function drawPlayer(){
+  const nm=esc((state.name||'Explorer').slice(0,14)),w=nm.length*7.5+20;
+  $('#playerLayer').innerHTML=`<g id="player"><ellipse cx="0" cy="0" rx="16" ry="6" fill="#000" opacity=".2"/><g class="pbody">
+   <rect x="-12" y="-36" width="9" height="20" rx="3" fill="#ff8a3d"/>
+   <rect x="-9" y="-16" width="7" height="16" rx="3" fill="#1e3a6b"/><rect x="2" y="-16" width="7" height="16" rx="3" fill="#1e3a6b"/>
+   <rect x="-11" y="-38" width="22" height="24" rx="7" fill="#fff" stroke="#c9d6e8" stroke-width="1.5"/>
+   <circle cx="0" cy="-50" r="12" fill="#f2c29b"/><path d="M-12 -52 Q-11 -66 0 -64 Q12 -66 12 -52 Q7 -59 0 -58 Q-7 -59 -12 -52Z" fill="#3b2a20"/>
+   <circle cx="-4" cy="-50" r="1.6" fill="#1c2a44"/><circle cx="4" cy="-50" r="1.6" fill="#1c2a44"/>
+   <rect x="${-w/2}" y="-90" width="${w}" height="20" rx="10" fill="#1e3a6b" stroke="#fff" stroke-width="2"/><text x="0" y="-75.5" text-anchor="middle" font-size="12" font-weight="900" font-family="Nunito,sans-serif" fill="#fff">${nm}</text>
+  </g></g>`;
+  placePlayer();
+}
+function placePlayer(){const p=$('#player');if(p)p.setAttribute('transform',`translate(${ppos[0]} ${ppos[1]+6}) scale(1.35)`);const d=$('#mmDot');d.setAttribute('cx',ppos[0]);d.setAttribute('cy',ppos[1])}
+function follow(){
+  const svg=$('#map'),wrap=$('#mapWrap'),ctm=svg.getScreenCTM();if(!ctm)return;
+  const r=wrap.getBoundingClientRect(),sx=ctm.a*ppos[0]+ctm.e-r.left,sy=ctm.d*ppos[1]+ctm.f-r.top;
+  wrap.scrollLeft+=sx-wrap.clientWidth/2;wrap.scrollTop+=sy-wrap.clientHeight/2;
+}
+function walkTo(target,cb){
+  if(walking)return;
+  if(state.pos===target){cb&&cb();return}
+  const seq=[];const dir=target>state.pos?1:-1;for(let i=state.pos+dir;dir>0?i<=target:i>=target;i+=dir)seq.push(i);
+  const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  walking=true;$('#player').classList.add('walking');renderPanel();
+  let k=0,from=ppos.slice(),t0=null,lastStep=0;
+  const speed=reduce?100000:340;
+  function frame(ts){
+    const to=PATH[seq[k]],dist=Math.hypot(to[0]-from[0],to[1]-from[1])||1;
+    if(t0===null)t0=ts;const f=Math.min(1,(ts-t0)/1000*speed/dist);
+    ppos=[from[0]+(to[0]-from[0])*f,from[1]+(to[1]-from[1])*f];placePlayer();follow();
+    if(ts-lastStep>260){sfx.step();lastStep=ts}
+    if(f>=1){state.pos=seq[k];k++;from=to.slice();t0=null;if(k>=seq.length){walking=false;$('#player').classList.remove('walking');save();renderPanel();cb&&cb();return}}
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+}
+
+/* ================= HUD / panel ================= */
+function renderHUD(){
+  $('#hudName').textContent=state.name||'Explorer';
+  $('#hudCls').textContent=state.cls?`Class ${state.cls} · Online`:'Online · 1 player';
+  $('#hudAv').innerHTML=kidSVG(30);
+  const n=doneCount(),nx=nextMission();
+  $('#hudTask').textContent=run?`Mission ${run.m.id}: ${run.m.name}`:nx?`Mission ${nx.id}: go to ${nx.name}`:'All missions complete! 🎉';
+  $('#hudBar').style.width=(n/MISSIONS.length*100)+'%';
+  $('#hudCount').textContent=`${n}/${MISSIONS.length}`;
+  $('#pStars span').textContent=totalStars();$('#pCoins span').textContent=state.coins;
+  $('#mmPct').textContent=Math.round(n/MISSIONS.length*100)+'%';
+  $('#audIc').textContent=state.muted?'🔇':'🔊';
+}
+let cardClosed=window.innerWidth<700;
+function renderPanel(){
+  const m=run?run.m:nextMission();
+  const box=$('#mCard');box.classList.toggle('closed',cardClosed);
+  if(!m){box.innerHTML=`<button class="mc-head" id="mcToggle"><span class="mc-num">🏁</span><span><b>Expedition complete!</b><small>${totalStars()} stars · ${totalMarks()}/${TOTAL} marks</small></span><span class="chev">▼</span></button><div class="mc-body"><div class="doing">Well done! You visited every station on Math Island.</div><div class="row-btns"><button class="btn sm primary" data-act="cert">🎓 Certificate</button><button class="btn sm ghost" data-act="all">All locations</button></div></div>`;return}
+  const atStation=state.pos===m.id&&!walking,N=m.questions.length;
+  const st=[[`Walk to ${m.name}`,atStation||!!run],['Listen to Teacher Smart',!!run&&run.started],[`Answer the questions (${run?run.qi:0}/${N})`,!!run&&run.finished],['Collect your reward',false]];
+  const nowIdx=st.findIndex(s=>!s[1]);
+  const doing=walking?`Walking to ${m.name}…`:nowIdx===0?`Tap ${m.name} on the map (or press Go).`:nowIdx===1?'Talk to Teacher Smart to start.':nowIdx===2?`Answering question ${run.qi+1} of ${N}.`:'Collect your stars!';
+  box.innerHTML=`<button class="mc-head" id="mcToggle" aria-expanded="${!cardClosed}"><span class="mc-num">${m.id}</span><span><b>${esc(m.name)}</b><small>${m.icon} ${esc(m.topic)}</small></span><span class="chev">▼</span></button>
+   <div class="mc-body"><ul class="steps">${st.map((s,i)=>`<li class="${s[1]?'done':i===nowIdx?'now':''}"><i>${s[1]?'✓':''}</i>${esc(s[0])}</li>`).join('')}</ul>
+   <div class="doing">▶ ${esc(doing)}</div>
+   <div class="row-btns">${nowIdx===0?`<button class="btn sm primary" data-act="go">🚶 Go</button>`:''}<button class="btn sm blue" data-act="read">📘 Read instructions</button><button class="btn sm ghost" data-act="all">📍 All locations</button></div></div>`;
+}
+function toast(msg,ms=2600){const t=$('#toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),ms)}
+function bump(id){const e=$(id);e.classList.remove('pop');void e.offsetWidth;e.classList.add('pop')}
+function coinFly(el){try{const r=el.getBoundingClientRect(),c=document.createElement('div');c.className='coin-fly';c.textContent='🪙 +10';c.style.left=(r.left+r.width/2-30)+'px';c.style.top=(r.top)+'px';document.body.appendChild(c);setTimeout(()=>c.remove(),950)}catch(e){}}
+
+/* ================= modal ================= */
+function openModal(html){$('#mBox').innerHTML=html;$('#modal').hidden=false;$('#mBox').scrollTop=0;const f=$('#mBox').querySelector('[autofocus]');f&&f.focus()}
+function closeModal(){$('#modal').hidden=true;$('#mBox').innerHTML=''}
+const cardTop=(title,right='')=>`<div class="card-top"><b>${title}</b><span>${right}</span></div>`;
+
+/* ================= start screen ================= */
+function showStart(){
+  const has=!!state.name;
+  openModal(`<div class="hero">${npcSVG(70)}<h1>Math Island<br>Expedition</h1><p>Year 2 Mathematics · 10 missions</p></div>
+  <form class="card-in" id="startForm">
+   <div class="intro"><div class="bubble" style="width:100%"><div class="nm">Teacher Smart</div>Hello, explorer! Visit every station on the island and solve the maths missions to earn stars and coins.</div></div>
+   ${has?`<button type="button" class="btn good" id="contBtn">▶ Continue as ${esc(state.name)}${state.cls?' ('+esc(state.cls)+')':''}</button><p class="note" style="text-align:center">or start as a new player:</p>`:''}
+   <label class="field" for="inName">Your name<input id="inName" maxlength="24" autocomplete="off" placeholder="e.g. Aisyah" ${has?'':'autofocus'} required></label>
+   <label class="field" for="inCls">Your class<input id="inCls" maxlength="12" autocomplete="off" placeholder="e.g. 2 Bijak"></label>
+   <button class="btn primary" type="submit">🚀 Start the expedition</button>
+  </form>`);
+  $('#mBox').closest('.modal').classList.add('start');
+  $('#startForm').addEventListener('submit',e=>{e.preventDefault();const n=$('#inName').value.trim();if(!n){$('#inName').focus();return}
+    state={name:n,cls:$('#inCls').value.trim(),coins:0,done:{},pos:0,muted:state.muted,unlockAll:false};ppos=DOCK.slice();save();begin(true)});
+  const c=$('#contBtn');c&&c.addEventListener('click',()=>begin(false));
+}
+function begin(fresh){
+  $('#modal').classList.remove('start');closeModal();tone(660,.1);drawPlayer();drawStations();renderHUD();renderPanel();follow();
+  const nx=nextMission();
+  if(fresh)setTimeout(()=>showGuide(true),250);
+  else toast(nx?`Welcome back, ${state.name}! Next: ${nx.name}.`:`Welcome back, ${state.name}!`);
+}
+
+/* ================= mission flow ================= */
+function clickStation(id){
+  if(walking)return;
+  const m=MISSIONS.find(x=>x.id===id);
+  if(!isUnlocked(m)){sfx.oops();toast(`🔒 Finish Mission ${m.id-1} (${MISSIONS[m.id-2].name}) first.`);return}
+  sfx.tap();walkTo(m.id,()=>showIntro(m));
+}
+function showIntro(m){
+  const prev=state.done[m.id];
+  openModal(`${cardTop(`Mission ${m.id} · ${esc(m.name)}`,`${m.icon}`)}<div class="card-in">
+   <div class="intro"><div class="npc">${npcSVG(76)}</div><div class="bubble"><div class="nm">Teacher Smart</div>${m.intro}</div></div>
+   <div class="chips"><span class="chip">${m.icon} ${esc(m.topic)}</span><span class="chip">${m.questions.length} question${m.questions.length>1?'s':''}</span><span class="chip">${mMax(m)} marks</span></div>
+   ${prev?`<p class="note">You finished this mission with ${'⭐'.repeat(prev.stars)} (${prev.marks}/${mMax(m)} marks). Play again to practise. Your best score is kept.</p>`:''}
+   <div class="foot"><button class="btn ghost" data-act="close">Not now</button><button class="btn primary" data-act="startM" autofocus>Let's go! →</button></div></div>`);
+  $('#mBox').querySelector('[data-act=startM]').onclick=()=>{run={m,qi:0,marks:0,started:true,finished:false,filled:{}};renderHUD();renderPanel();renderQ()};
+}
+function visual(v){
+  if(v.clock)return clockSVG(v.clock[0],v.clock[1],170);
+  if(v.scale)return scaleSVG(...v.scale);
+  if(v.number)return `<div class="digits" aria-label="${v.number}">${String(v.number).split('').map(d=>`<span>${d}</span>`).join('')}</div>`;
+  if(v.money)return v.money.map((a,i)=>`${i?'<span class="plus">+</span>':''}<span class="tag">💵 RM ${a.toFixed(2)}</span>`).join('');
+  if(v.fruits)return `<div class="fruit-pic" aria-label="Picture of fruits">${FRUIT_PIC.map(f=>`<span>${f}</span>`).join('')}</div><div class="tw"><table class="fruit-t" id="fruitT">${fruitRows()}</table></div>`;
+  if(v.day)return DAY.map(([a,h,mm])=>`<div class="clock-wrap">${clockSVG(h,mm,110)}<span>${a}</span></div>`).join('');
+  if(v.story)return `<div style="display:grid;gap:8px;justify-items:center"><div class="chips"><span class="chip">📚 Books</span><span class="chip">✏️ Pencils</span><span class="chip">🏪 Ali's shop</span></div><div class="digits" style="gap:4px"><span style="width:auto;padding:0 14px;font-size:26px;height:56px">RM 120 + RM 75 = RM 195</span></div></div>`;
+  return '';
+}
+function fruitRows(){
+  const f=run?run.filled:{};
+  const cell=(k,t)=>{if(k==='mango')return t==='tally'?tallySVG(3):'3';const on=f[k+'_'+t];return on?`<span class="${on==='new'?'':''}">${t==='tally'?tallySVG(FRUITS[k][2]):FRUITS[k][2]}</span>`:'<span class="q">?</span>'};
+  return `<tr><th>Fruit</th><th>Tally</th><th>Number</th></tr>`+['apple','banana','orange','mango'].map(k=>`<tr><td>${FRUITS[k][0]} ${FRUITS[k][1]}</td><td>${cell(k,'tally')}</td><td>${cell(k,'num')}</td></tr>`).join('');
+}
+function renderQ(){
+  const m=run.m,q=m.questions[run.qi],N=m.questions.length;run.first=true;
+  openModal(`${cardTop(`${m.icon} Mission ${m.id} · ${esc(m.name)}`,`Question ${run.qi+1} of ${N}`)}<div class="card-in">
+   <div class="dots">${m.questions.map((_,i)=>`<i class="${i<run.qi?'on':i===run.qi?'cur':''}"></i>`).join('')}</div>
+   <h2 class="q-text">${q.q}</h2>
+   ${q.v?`<div class="q-visual">${visual(q.v)}</div>`:''}
+   <div id="qBody"></div>
+   <div class="feedback" id="fb" hidden aria-live="polite"></div>
+   <div class="foot"><button class="btn ghost" data-act="quit">✕ Back to map</button><button class="btn primary" id="qNext" hidden>${run.qi===N-1?'Finish mission ✓':'Next question →'}</button></div></div>`);
+  $('#qNext').onclick=()=>{run.qi++;if(run.qi>=N)finishMission();else{renderPanel();renderQ()}};
+  if(q.type==='mcq')mcq(q);else if(q.type==='shade')shade(q);else if(q.type==='nets')nets(q);
+}
+function answerRight(q,el,extra=''){
+  const fb=$('#fb');fb.hidden=false;fb.className='feedback good';
+  let ex=q.explain||'';
+  if(q.v&&q.v.money){const tot=q.v.money.reduce((a,b)=>a+Math.round(b*100),0)/100,w=10,line=a=>('RM '+a.toFixed(2)).padStart(w);
+    ex=`Here is the working:<br><span class="working">${q.v.money.map((a,i)=>(i===q.v.money.length-1?'+ ':'  ')+line(a)).join('\n')}\n  ${'-'.repeat(w)}\n  ${line(tot)}</span>`}
+  fb.innerHTML=`<b>${pick(['Well done!','Correct!','Great job!','You got it!','Excellent!'])}</b> ${ex}${extra}`;
+  if(run.first){run.marks+=qMarks(q);state.coins+=10;bump('#pCoins');coinFly(el||fb)}
+  if(q.fill){run.filled[q.fill[0]+'_'+q.fill[1]]=1;const t=$('#fruitT');t&&(t.innerHTML=fruitRows())}
+  renderHUD();sfx.ding();const n=$('#qNext');n.hidden=false;n.focus({preventScroll:true});
+  fb.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+function answerWrong(q,msg){
+  run.first=false;const fb=$('#fb');fb.hidden=false;fb.className='feedback bad';
+  fb.innerHTML=`<b>${pick(['Not quite.','Try again!','Almost!','Oops!'])}</b> ${msg||q.hint||run.m.hint}`;sfx.oops();
+}
+function mcq(q){
+  const order=shuffle(q.opts.map((o,i)=>i));
+  $('#qBody').innerHTML=`<div class="opts">${order.map((i,k)=>`<button class="opt" data-i="${i}"><span class="L">${'ABC'[k]}</span><span>${q.opts[i]}</span></button>`).join('')}</div>${q.story?'':''}`;
+  $('#qBody').querySelectorAll('.opt').forEach(b=>b.onclick=()=>{
+    if(+b.dataset.i===0){b.classList.add('right');$('#qBody').querySelectorAll('.opt').forEach(x=>x.disabled=true);
+      answerRight(q,b,q.story?`<label class="field" for="ownStory" style="margin-top:10px">Now write your own story (not marked):<textarea id="ownStory" rows="3" placeholder="Ali's shop sold…"></textarea></label>`:'')}
+    else{b.classList.remove('wrong');void b.offsetWidth;b.classList.add('wrong');b.disabled=true;answerWrong(q)}
+  });
+}
+function shade(q){
+  let svg='',n=q.parts;
+  const c='fill="#fff" stroke="#1e3a6b" stroke-width="3"';
+  if(q.shape==='circle'){svg=`<svg class="shade-svg" viewBox="0 0 200 200" width="210" height="210">`;for(let i=0;i<n;i++){const a1=rad(i*360/n),a2=rad((i+1)*360/n);svg+=`<path data-p="${i}" d="M100 100 L${100+90*Math.sin(a1)} ${100-90*Math.cos(a1)} A90 90 0 0 1 ${100+90*Math.sin(a2)} ${100-90*Math.cos(a2)} Z" ${c}/>`}}
+  if(q.shape==='rect'){svg=`<svg class="shade-svg" viewBox="0 0 250 100" width="280" height="112">`;for(let i=0;i<n;i++)svg+=`<rect data-p="${i}" x="${5+i*40}" y="5" width="40" height="90" ${c}/>`}
+  if(q.shape==='square'){svg=`<svg class="shade-svg" viewBox="0 0 170 170" width="190" height="190">`;for(let i=0;i<4;i++)svg+=`<rect data-p="${i}" x="${5+(i%2)*80}" y="${5+Math.floor(i/2)*80}" width="80" height="80" ${c}/>`}
+  svg+='</svg>';
+  $('#qBody').innerHTML=`<div class="shade-area">${svg}<div class="shade-count" id="sc">Shaded: 0 of ${n} parts · tap a part to shade it</div><button class="btn blue" id="chk">✔ Check</button></div>`;
+  const on=new Set();let locked=false;
+  $('#qBody').querySelectorAll('[data-p]').forEach(p=>p.onclick=()=>{if(locked)return;const i=p.dataset.p;on.has(i)?on.delete(i):on.add(i);p.setAttribute('fill',on.has(i)?'#ff8a3d':'#fff');sfx.tap();$('#sc').textContent=`Shaded: ${on.size} of ${n} parts`});
+  $('#chk').onclick=()=>{if(locked)return;if(on.size===q.need){locked=true;$('#chk').disabled=true;answerRight(q,$('#chk'))}else answerWrong(q,`You shaded ${on.size} part${on.size===1?'':'s'}. You need to shade exactly ${q.need} of the ${n} parts.`)};
+}
+function nets(q){
+  const labels='PQRST',order=shuffle(NET_KINDS.map(k=>k[0]));
+  $('#qBody').innerHTML=`<div class="nets"><div class="zones">${NET_KINDS.map(([k,nm],i)=>`<div class="zone" data-k="${k}"><span class="nm">${i+1}. ${nm}</span>${solidSVG(k)}<div class="slot">drop net here</div></div>`).join('')}</div>
+   <div class="tray" id="tray">${order.map((k,i)=>`<div class="net" data-k="${k}" tabindex="0" role="button" aria-label="Net ${labels[i]}"><b>${labels[i]}</b>${netSVG(k)}</div>`).join('')}</div>
+   <div style="display:flex;justify-content:center"><button class="btn blue" id="chk">✔ Check my matches</button></div></div>`;
+  let sel=null,drag=null,locked=false;const tray=$('#tray');
+  const select=n=>{document.querySelectorAll('.net.sel').forEach(x=>x.classList.remove('sel'));sel=n;n&&n.classList.add('sel')};
+  function place(net,target){
+    if(!target)return;
+    if(target.classList.contains('zone')){const slot=target.querySelector('.slot'),old=slot.querySelector('.net');if(old&&old!==net)tray.appendChild(old);slot.textContent='';slot.appendChild(net)}
+    else if(target===tray)tray.appendChild(net);
+    document.querySelectorAll('.slot').forEach(s=>{if(!s.querySelector('.net'))s.textContent='drop net here'});
+    net.classList.remove('bad','ok');sfx.tap();select(null);
+  }
+  $('#qBody').querySelectorAll('.net').forEach(n=>{
+    n.addEventListener('pointerdown',e=>{if(locked)return;drag={n,x:e.clientX,y:e.clientY,moved:false,g:null};n.setPointerCapture(e.pointerId)});
+    n.addEventListener('pointermove',e=>{if(!drag||drag.n!==n)return;if(!drag.moved&&Math.hypot(e.clientX-drag.x,e.clientY-drag.y)>6){drag.moved=true;drag.g=n.cloneNode(true);drag.g.classList.add("drag-ghost");drag.g.style.width=n.offsetWidth+'px';document.body.appendChild(drag.g);n.style.opacity=.35}
+      if(drag.moved){drag.g.style.left=e.clientX+'px';drag.g.style.top=e.clientY+'px';document.querySelectorAll('.zone.hot,.tray.hot').forEach(z=>z.classList.remove('hot'));const t=hitTarget(e);t&&t.classList.add('hot')}});
+    const end=e=>{if(!drag||drag.n!==n)return;const d=drag;drag=null;n.style.opacity='';document.querySelectorAll('.hot').forEach(z=>z.classList.remove('hot'));
+      if(d.moved){d.g.remove();place(n,hitTarget(e))}else{select(sel===n?null:n)}};
+    n.addEventListener('pointerup',end);n.addEventListener('pointercancel',e=>{if(drag&&drag.g)drag.g.remove();drag=null;n.style.opacity=''});
+    n.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();select(sel===n?null:n)}});
+  });
+  function hitTarget(e){const el=document.elementFromPoint(e.clientX,e.clientY);return el&&(el.closest('.zone')||el.closest('.tray'))}
+  $('#qBody').querySelectorAll('.zone').forEach(z=>{z.addEventListener('click',e=>{if(sel&&!locked&&!e.target.closest('.net')){place(sel,z)}});z.tabIndex=0;z.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&sel){e.preventDefault();place(sel,z)}})});
+  tray.addEventListener('click',e=>{if(sel&&!e.target.closest('.net'))place(sel,tray)});
+  $('#chk').onclick=()=>{
+    if(locked)return;const zones=[...document.querySelectorAll('.zone')];
+    if(zones.some(z=>!z.querySelector('.net'))){toast('Place all 5 nets on the shapes first.');sfx.oops();return}
+    let right=0;zones.forEach(z=>{const n=z.querySelector('.net');if(n.dataset.k===z.dataset.k){right++;n.classList.add('ok')}else n.classList.add('bad')});
+    if(run.first){run.marks+=right*2;run.netFirst=right}
+    if(right===5){locked=true;$('#chk').disabled=true;const wasFirst=run.first;run.first=false;q._tmp=true;
+      if(wasFirst){state.coins+=10;bump('#pCoins')}
+      const fb=$('#fb');fb.hidden=false;fb.className='feedback good';fb.innerHTML=`<b>All 5 correct!</b> Cube = 6 squares, cuboid = 6 rectangles, cylinder = 2 circles + 1 rectangle, cone = 1 circle + 1 curved part, pyramid = 1 square + 4 triangles.${wasFirst?'':` You scored ${run.netFirst*2}/10 on your first try.`}`;
+      renderHUD();sfx.ding();const nb=$('#qNext');nb.hidden=false;
+    }else{run.first=false;answerWrong(q,`${right} of 5 are correct. The red ones are wrong; they go back to the tray. Try again!`);
+      setTimeout(()=>zones.forEach(z=>{const n=z.querySelector('.net');if(n&&n.classList.contains('bad')){n.classList.remove('bad');tray.appendChild(n);z.querySelector('.slot').textContent='drop net here'}}),1100)}
+  };
+}
+function finishMission(){
+  const m=run.m,max=mMax(m),pct=run.marks/max,stars=pct>=.9?3:pct>=.6?2:1,prev=state.done[m.id];
+  run.finished=true;renderPanel();
+  if(!prev||run.marks>prev.marks||stars>prev.stars)state.done[m.id]={stars:Math.max(stars,prev?prev.stars:0),marks:Math.max(run.marks,prev?prev.marks:0),max};
+  state.coins+=20;save();const r=run;run=null;
+  drawStations();renderHUD();renderPanel();sfx.win();bump('#pStars');
+  const nx=nextMission(),all=!nx;
+  openModal(`${cardTop(`${m.icon} Mission ${m.id} complete!`,'+20 🪙 bonus')}<div class="card-in big-c">
+   <div class="stars">${[1,2,3].map(i=>`<i class="${i<=stars?'':'off'}" style="animation-delay:${i*.18}s">⭐</i>`).join('')}</div>
+   <h2>${stars===3?'Amazing work!':stars===2?'Good job!':'Well tried!'}</h2>
+   <p class="note">You scored <b>${r.marks}/${max}</b> marks on your first tries in ${esc(m.name)}.</p>
+   ${all?`<p class="note">You finished every mission on Math Island! 🎉</p>`:`<p class="note">Next stop: <b>Mission ${nx.id} · ${esc(nx.name)}</b> ${nx.icon}</p>`}
+   <div class="foot" style="justify-content:center"><button class="btn ghost" data-act="close">Back to map</button>${all?`<button class="btn primary" data-act="cert">🎓 My certificate</button>`:`<button class="btn primary" data-act="goNext">Go to ${esc(nx.name)} →</button>`}</div></div>`);
+}
+
+/* ================= other screens ================= */
+function showGuide(first){
+  openModal(`${cardTop('📘 How to play','')}<div class="card-in">
+   <div class="intro"><div class="npc">${npcSVG(70)}</div><div class="bubble"><div class="nm">Teacher Smart</div>${first?`Welcome, ${esc(state.name)}! `:''}Your job is to visit all 10 stations on Math Island and finish each maths mission.</div></div>
+   <ol style="margin:0;padding-left:22px;line-height:1.6;font-weight:700">
+    <li>Tap the station with the yellow <b>!</b> marker. Your explorer walks there.</li>
+    <li>Read Teacher Smart's message, then press <b>Let's go!</b></li>
+    <li>Answer each question. Correct on the first try = full marks and 🪙 10 coins.</li>
+    <li>Wrong answer? Read the hint and try again.</li>
+    <li>Finish a mission to earn up to ⭐⭐⭐ and unlock the next station.</li>
+    <li>Finish all 10 missions to get your certificate! 🎓</li>
+   </ol>
+   <p class="note">Tip: on a phone, drag the map with your finger to look around. Tap 📍 to find your explorer.</p>
+   <div class="foot" style="justify-content:flex-end"><button class="btn primary" data-act="close" autofocus>${first?'Start exploring!':'Got it'}</button></div></div>`);
+}
+function showAll(){
+  openModal(`${cardTop('📍 All locations',`${doneCount()}/${MISSIONS.length} done`)}<div class="card-in"><div class="list">${MISSIONS.map(m=>{const d=state.done[m.id],l=!isUnlocked(m);
+   return `<button class="li ${l?'locked':''}" data-goto="${m.id}"><span class="n">${m.id}</span><span>${m.icon} ${esc(m.name)}<br><small style="color:var(--muted)">${esc(m.topic)}</small></span><span class="s">${l?'🔒':d?'⭐'.repeat(d.stars):'New'}</span></button>`}).join('')}</div>
+   <div class="foot" style="justify-content:flex-end"><button class="btn ghost" data-act="close">Close</button></div></div>`);
+}
+function showAch(){
+  const badges=[['First steps','Finish 1 mission',doneCount()>=1],['Time keeper','Finish Missions 1, 2 and 9',[1,2,9].every(i=>state.done[i])],['Super saver','Collect 200 coins',state.coins>=200],['Star collector','Earn 20 stars',totalStars()>=20],['Perfect!','Get 3 stars in any mission',Object.values(state.done).some(d=>d.stars===3)],['Island hero','Finish all 10 missions',doneCount()===MISSIONS.length]];
+  openModal(`${cardTop('🏆 Awards',`${totalStars()} ⭐ · ${state.coins} 🪙`)}<div class="card-in"><div class="list">${badges.map(([t,d,ok])=>`<div class="li ${ok?'':'locked'}"><span class="n" style="background:${ok?'var(--gold)':'var(--lock)'}">${ok?'🏅':'·'}</span><span>${t}<br><small style="color:var(--muted)">${d}</small></span><span class="s">${ok?'Unlocked':'Locked'}</span></div>`).join('')}</div>
+   <p class="note">Score so far: <b>${totalMarks()}/${TOTAL}</b> marks.</p>
+   <div class="foot" style="justify-content:flex-end">${doneCount()===MISSIONS.length?`<button class="btn primary" data-act="cert">🎓 Certificate</button>`:''}<button class="btn ghost" data-act="close">Close</button></div></div>`);
+}
+function showPlayers(){
+  openModal(`${cardTop('👥 Players','Online: 1 player')}<div class="card-in"><div class="li"><span class="av" style="width:40px;height:40px;border-radius:50%;background:var(--paper);display:grid;place-items:center">${kidSVG(34)}</span><span>${esc(state.name)}<br><small style="color:var(--muted)">${state.cls?'Class '+esc(state.cls):'No class'} · this device</small></span><span class="s">${totalStars()} ⭐ · ${state.coins} 🪙</span></div>
+   <p class="note">Each pupil plays on their own device. Progress is saved in this browser.</p>
+   <div class="foot"><button class="btn ghost" data-act="switch">Change player</button><button class="btn primary" data-act="close">Close</button></div></div>`);
+}
+let teacher=false;
+function showSettings(){
+  openModal(`${cardTop('⚙️ Settings','')}<div class="card-in">
+   <button class="li" data-act="audio"><span class="n">${state.muted?'🔇':'🔊'}</span><span>Sound effects</span><span class="s">${state.muted?'Off':'On'}</span></button>
+   ${teacher?teacherPanel():`<form id="tForm" class="field" style="gap:8px"><label for="tPass">Teacher mode</label><div style="display:flex;gap:8px"><input id="tPass" type="password" placeholder="Password" style="flex:1;min-width:0"><button class="btn blue" type="submit">Unlock</button></div><span id="tErr" class="note"></span></form>`}
+   <div class="foot" style="justify-content:flex-end"><button class="btn ghost" data-act="close">Close</button></div></div>`);
+  const f=$('#tForm');f&&f.addEventListener('submit',e=>{e.preventDefault();if($('#tPass').value==='teacher123'){teacher=true;showSettings()}else{$('#tErr').textContent='Wrong password. Try again.';sfx.oops()}});
+}
+function teacherPanel(){
+  return `<div class="field">Teacher mode</div><div class="row-btns"><button class="btn sm blue" data-act="unlock">${state.unlockAll?'Lock missions again':'Unlock all missions'}</button><button class="btn sm ghost" data-act="reset" id="resetBtn">Reset progress</button></div>
+  <div class="key"><b>Answer key</b>${MISSIONS.map(m=>`<h4>${m.id}. ${esc(m.name)}</h4><ol>${m.questions.map(q=>`<li>${esc(strip(q.q))} → <b>${q.type==='mcq'?esc(q.key||strip(q.opts[0])):q.type==='shade'?`shade ${q.need} of ${q.parts} parts`:'cube→cross of 6 squares; cuboid→6 rectangles; cylinder→rectangle + 2 circles; cone→curved part + circle; pyramid→square + 4 triangles'}</b>${q.v&&q.v.money?` (${'RM '+(q.v.money.reduce((a,b)=>a+Math.round(b*100),0)/100).toFixed(2)})`:''}</li>`).join('')}</ol>`).join('')}</div>`;
+}
+function showCert(){
+  const d=new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
+  openModal(`${cardTop('🎓 Certificate','')}<div class="card-in"><div class="cert">
+   <div class="t1">CERTIFICATE OF ACHIEVEMENT</div><div class="t2">Math Island Expedition</div>
+   <div class="note">This certificate is proudly presented to</div><div class="nm">${esc(state.name)}</div>
+   <div class="note">${state.cls?'Class '+esc(state.cls)+' · ':''}for completing all 10 Year 2 maths missions</div>
+   <div class="stats"><div>⭐ ${totalStars()} / 30 stars</div><div>📝 ${totalMarks()} / ${TOTAL} marks</div><div>🪙 ${state.coins} coins</div></div>
+   <div class="note" style="margin-top:6px">${d} · Teacher Smart</div></div>
+   <p class="note" style="text-align:center">Take a screenshot to keep your certificate!</p>
+   <div class="foot" style="justify-content:center"><button class="btn ghost" data-act="close">Back to map</button><button class="btn primary" data-act="again" id="againBtn">Play again</button></div></div>`);
+}
+
+/* ================= events ================= */
+$('#map').addEventListener('click',e=>{const s=e.target.closest('.station');if(!s)return;if(s.id==='npcMap'){sfx.tap();showGuide(false);return}clickStation(+s.dataset.id)});
+$('#map').addEventListener('keydown',e=>{if(e.key!=='Enter'&&e.key!==' ')return;const s=e.target.closest('.station');if(!s)return;e.preventDefault();if(s.id==='npcMap')showGuide(false);else clickStation(+s.dataset.id)});
+document.querySelector('.tools').addEventListener('click',e=>{const b=e.target.closest('.tool');if(!b)return;const t=b.dataset.tool;
+  if(t==='guide')showGuide(false);if(t==='ach')showAch();if(t==='players')showPlayers();if(t==='settings')showSettings();
+  if(t==='audio'){state.muted=!state.muted;save();renderHUD();if(!state.muted)sfx.ding();toast(state.muted?'Sound off 🔇':'Sound on 🔊',1500)}});
+$('#centerBtn').onclick=follow;
+let resetArm=false,againArm=false;
+document.addEventListener('click',e=>{
+  const t=e.target.closest('#mcToggle');if(t){cardClosed=!cardClosed;renderPanel();return}
+  const g=e.target.closest('[data-goto]');if(g){const id=+g.dataset.goto;closeModal();clickStation(id);return}
+  const a=e.target.closest('[data-act]');if(!a)return;const act=a.dataset.act;
+  if(act==='close'){closeModal();renderPanel()}
+  if(act==='quit'){run=null;closeModal();renderHUD();renderPanel();toast('Mission paused. Tap the station to try again.')}
+  if(act==='go'){const m=nextMission();m&&clickStation(m.id)}
+  if(act==='read'){const m=run?run.m:nextMission();m&&showIntro(m)}
+  if(act==='all')showAll();
+  if(act==='cert')showCert();
+  if(act==='goNext'){closeModal();const m=nextMission();m&&setTimeout(()=>clickStation(m.id),150)}
+  if(act==='switch'){closeModal();showStart()}
+  if(act==='audio'){state.muted=!state.muted;save();renderHUD();showSettings()}
+  if(act==='unlock'){state.unlockAll=!state.unlockAll;save();drawStations();showSettings();toast(state.unlockAll?'All missions unlocked.':'Missions locked in order again.')}
+  if(act==='reset'){if(!resetArm){resetArm=true;a.textContent='Tap again to confirm';setTimeout(()=>{resetArm=false;const r=$('#resetBtn');r&&(r.textContent='Reset progress')},3000);return}
+    resetArm=false;state=Object.assign(state,{coins:0,done:{},pos:0});ppos=DOCK.slice();save();placePlayer();drawStations();renderHUD();renderPanel();closeModal();toast('Progress reset.')}
+  if(act==='again'){if(!againArm){againArm=true;a.textContent='Tap again to restart';setTimeout(()=>{againArm=false},3000);return}
+    againArm=false;state=Object.assign(state,{coins:0,done:{},pos:0});ppos=DOCK.slice();save();placePlayer();drawStations();renderHUD();renderPanel();closeModal();follow();toast('New expedition started! Good luck!')}
+});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#modal').hidden&&!$('#modal').classList.contains('start')){if(run){run=null;renderHUD()}closeModal();renderPanel()}});
+window.addEventListener('resize',()=>{clearTimeout(window._rz);window._rz=setTimeout(follow,150)});
+
+/* ================= boot ================= */
+drawWorld();drawPlayer();renderHUD();renderPanel();
+requestAnimationFrame(follow);
+showStart();
+</script>
+</body>
+</html>
