@@ -118,7 +118,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,.station:focus-v
 .modal{position:fixed;inset:0;z-index:20;display:grid;place-items:center;background:rgba(18,32,60,.55);backdrop-filter:blur(3px);
   padding:16px max(16px,env(safe-area-inset-right,0px)) 16px max(16px,env(safe-area-inset-left,0px))}
 .card{background:var(--paper);border-radius:20px;width:min(680px,100%);max-height:calc(100% - 8px);overflow:auto;box-shadow:0 8px 0 rgba(30,58,107,.35),0 20px 50px rgba(0,0,0,.3);animation:rise .3s}
-@keyframes rise{from{transform:translateY(20px) scale(.97);opacity:0}}
+@keyframes rise{from{transform:translateY(20px) scale(.97)}}
 .card-top{background:var(--navy);color:#fff;padding:12px 18px;display:flex;justify-content:space-between;gap:10px;align-items:center;position:sticky;top:0;z-index:1}
 .card-top b{font-family:var(--display);font-size:18px;line-height:1.1}
 .card-top span{font-size:13px;font-weight:800;opacity:.9;white-space:nowrap}
@@ -601,16 +601,17 @@ const cardTop=(title,right='')=>`<div class="card-top"><b>${title}</b><span>${ri
 function showStart(){
   const has=!!state.name;
   openModal(`<div class="hero">${npcSVG(70)}<h1>Math Island<br>Expedition</h1><p>Year 2 Mathematics · 10 missions</p></div>
-  <form class="card-in" id="startForm">
+  <div class="card-in" id="startForm">
    <div class="intro"><div class="bubble" style="width:100%"><div class="nm">Teacher Smart</div>Hello, explorer! Visit every station on the island and solve the maths missions to earn stars and coins.</div></div>
    ${has?`<button type="button" class="btn good" id="contBtn">▶ Continue as ${esc(state.name)}${state.cls?' ('+esc(state.cls)+')':''}</button><p class="note" style="text-align:center">or start as a new player:</p>`:''}
    <label class="field" for="inName">Your name<input id="inName" maxlength="24" autocomplete="off" placeholder="e.g. Aisyah" ${has?'':'autofocus'} required></label>
    <label class="field" for="inCls">Your class<input id="inCls" maxlength="12" autocomplete="off" placeholder="e.g. 2 Bijak"></label>
-   <button class="btn primary" type="submit">🚀 Start the expedition</button>
-  </form>`);
+   <button class="btn primary" type="button" id="startBtn">🚀 Start the expedition</button>
+  </div>`);
   $('#mBox').closest('.modal').classList.add('start');
-  $('#startForm').addEventListener('submit',e=>{e.preventDefault();const n=$('#inName').value.trim();if(!n){$('#inName').focus();return}
-    state={name:n,cls:$('#inCls').value.trim(),coins:0,done:{},pos:0,muted:state.muted,unlockAll:false};ppos=DOCK.slice();save();begin(true)});
+  const go=()=>{const n=$('#inName').value.trim();if(!n){$('#inName').focus();toast('Please type your name first.');return}
+    state={name:n,cls:$('#inCls').value.trim(),coins:0,done:{},pos:0,muted:state.muted,unlockAll:false};ppos=DOCK.slice();save();begin(true)};
+  $('#startBtn').addEventListener('click',go);['#inName','#inCls'].forEach(id=>$(id).addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();go()}}));
   const c=$('#contBtn');c&&c.addEventListener('click',()=>begin(false));
 }
 function begin(fresh){
@@ -788,9 +789,10 @@ let teacher=false;
 function showSettings(){
   openModal(`${cardTop('⚙️ Settings','')}<div class="card-in">
    <button class="li" data-act="audio"><span class="n">${state.muted?'🔇':'🔊'}</span><span>Sound effects</span><span class="s">${state.muted?'Off':'On'}</span></button>
-   ${teacher?teacherPanel():`<form id="tForm" class="field" style="gap:8px"><label for="tPass">Teacher mode</label><div style="display:flex;gap:8px"><input id="tPass" type="password" placeholder="Password" style="flex:1;min-width:0"><button class="btn blue" type="submit">Unlock</button></div><span id="tErr" class="note"></span></form>`}
+   ${teacher?teacherPanel():`<div id="tForm" class="field" style="gap:8px"><label for="tPass">Teacher mode</label><div style="display:flex;gap:8px"><input id="tPass" type="password" placeholder="Password" style="flex:1;min-width:0"><button class="btn blue" type="button" id="tBtn">Unlock</button></div><span id="tErr" class="note"></span></div>`}
    <div class="foot" style="justify-content:flex-end"><button class="btn ghost" data-act="close">Close</button></div></div>`);
-  const f=$('#tForm');f&&f.addEventListener('submit',e=>{e.preventDefault();if($('#tPass').value==='teacher123'){teacher=true;showSettings()}else{$('#tErr').textContent='Wrong password. Try again.';sfx.oops()}});
+  const tb=$('#tBtn');const tryT=()=>{if($('#tPass').value==='teacher123'){teacher=true;showSettings()}else{$('#tErr').textContent='Wrong password. Try again.';sfx.oops()}};
+  if(tb){tb.addEventListener('click',tryT);$('#tPass').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();tryT()}})}
 }
 function teacherPanel(){
   return `<div class="field">Teacher mode</div><div class="row-btns"><button class="btn sm blue" data-act="unlock">${state.unlockAll?'Lock missions again':'Unlock all missions'}</button><button class="btn sm ghost" data-act="reset" id="resetBtn">Reset progress</button></div>
@@ -835,6 +837,7 @@ document.addEventListener('click',e=>{
   if(act==='again'){if(!againArm){againArm=true;a.textContent='Tap again to restart';setTimeout(()=>{againArm=false},3000);return}
     againArm=false;state=Object.assign(state,{coins:0,done:{},pos:0});ppos=DOCK.slice();save();placePlayer();drawStations();renderHUD();renderPanel();closeModal();follow();toast('New expedition started! Good luck!')}
 });
+$('#modal').addEventListener('click',e=>{if(e.target.id==='modal'&&!$('#modal').classList.contains('start')&&!run){closeModal();renderPanel()}});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#modal').hidden&&!$('#modal').classList.contains('start')){if(run){run=null;renderHUD()}closeModal();renderPanel()}});
 window.addEventListener('resize',()=>{clearTimeout(window._rz);window._rz=setTimeout(follow,150)});
 
